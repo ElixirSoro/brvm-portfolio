@@ -1,0 +1,20 @@
+[theme]
+base = "dark"
+primaryColor = "#F0B429"
+backgroundColor = "#0D141F"
+secondaryBackgroundColor = "#18263A"
+textColor = "#E8EDF3"
+borderColor = "#243447"
+font = "Instrument Sans, sans-serif"
+headingFont = "Bricolage Grotesque, sans-serif"
+codeFont = "JetBrains Mono, monospace"
+
+[server]
+headless = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
