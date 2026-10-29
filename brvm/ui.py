@@ -167,7 +167,11 @@ def current_user() -> auth.User | None:
     data = st.session_state.get(SESSION_USER)
     if not isinstance(data, dict):
         return None
-    return auth.User(str(data["id"]), str(data["email"]))
+    user = auth.User(str(data["id"]), str(data["email"]))
+    if not auth.is_active(user.id):  # compte supprimé ou suspendu depuis la connexion : session fermée
+        st.session_state.pop(SESSION_USER, None)
+        return None
+    return user
 
 
 def remember(user: auth.User) -> None:

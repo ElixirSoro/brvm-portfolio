@@ -88,6 +88,12 @@ ses propres portefeuilles, opérations et grille de frais ; les cours, documents
 communs. Seuls les administrateurs (`ADMIN_EMAILS`) peuvent mettre à jour ces données communes. En local
 (base SQLite), il n'y a pas de compte.
 
+**Administration** (page visible des seuls administrateurs) : liste des comptes avec leur activité (nombre de
+portefeuilles et d'opérations, jamais leur contenu), mot de passe provisoire en cas d'oubli, suspension et
+réactivation (la session en cours est coupée), suppression définitive d'un compte et de toutes ses données,
+nomination d'autres administrateurs. On ne peut ni se suspendre, ni se supprimer, ni se retirer ses propres droits ;
+les adresses de `ADMIN_EMAILS` restent administrateurs en permanence.
+
 L'application tourne aussi sur Streamlit Community Cloud (accès privé, sur invitation), branchée sur
 une base PostgreSQL Supabase (projet `brvm-portfolio`, us-east-1).
 

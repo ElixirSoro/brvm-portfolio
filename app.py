@@ -25,7 +25,8 @@ user = ui.current_user()
 signed_out = auth.enabled() and user is None
 # chaque exécution fixe le propriétaire des données personnelles avant d'afficher quoi que ce soit
 auth.set_owner(user.id if user else auth.LOCAL_OWNER)
-nav = st.navigation(LOGIN if signed_out else PAGES)
+ADMIN = [st.Page("views/administration.py", title="Administration", icon=":material/admin_panel_settings:")]
+nav = st.navigation(LOGIN if signed_out else PAGES + (ADMIN if user and user.is_admin else []))
 if not signed_out:
     ui.sidebar()
     ui.account_box()

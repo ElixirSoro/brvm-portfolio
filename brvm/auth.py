@@ -30,6 +30,7 @@ MESSAGES = {
     "email not confirmed": "Confirme d'abord ton adresse avec le lien reçu par e-mail.",
     "signups not allowed": "Les inscriptions sont fermées pour le moment.",
     "rate limit": "Trop de tentatives : réessaie dans quelques minutes.",
+    "banned": "Compte suspendu : contacte l'administrateur.",
     "password": "Mot de passe trop faible : au moins 8 caractères, avec lettres et chiffres.",
 }
 
@@ -51,8 +52,32 @@ class User:
 
     @property
     def is_admin(self) -> bool:
-        """Vrai si l'utilisateur peut modifier les données communes."""
-        return self.email.lower() in config.ADMIN_EMAILS
+        """Vrai si l'utilisateur est administrateur (données communes, maintenance des comptes)."""
+        return has_admin_rights(self.email)
+
+
+ADMIN_SETTING = "admin_emails"
+
+
+def admin_emails() -> frozenset[str]:
+    """Administrateurs : ceux de la configuration (permanents) et ceux nommés depuis la page Administration."""
+    named = db.get_setting(ADMIN_SETTING, []) or []
+    if not isinstance(named, list):
+        raise ValueError("réglage admin_emails invalide")
+    return config.ADMIN_EMAILS | {str(e).lower() for e in named}
+
+
+def has_admin_rights(email: str) -> bool:
+    """Vrai si l'adresse a les droits d'administration."""
+    return bool(email) and email.strip().lower() in admin_emails()
+
+
+def is_active(user_id: str) -> bool:
+    """Vrai si le compte existe toujours et n'est pas suspendu (vérifié à chaque page, version en ligne)."""
+    if not enabled():
+        return True
+    row = db.df("SELECT 1 FROM auth.users WHERE id::text = ? AND (banned_until IS NULL OR banned_until < now())", (user_id,))
+    return not row.empty
 
 
 def enabled() -> bool:
