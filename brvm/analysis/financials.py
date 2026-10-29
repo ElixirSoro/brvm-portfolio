@@ -145,7 +145,7 @@ Réponds UNIQUEMENT par un objet JSON :
  "commentaire": "<2 phrases maximum sur l'évolution de l'activité et des résultats>"}"""
 
 
-def extract_ai(pdf_path: Path, client: Any) -> tuple[dict[str, Figure], dict]:
+def extract_ai(pdf_path: Path, client: Any) -> tuple[dict[str, Figure], dict[str, Any]]:
     """Grands postes lus par l'IA (lit les PDF scannés). Renvoie (figures, métadonnées)."""
     data = Path(pdf_path).read_bytes()
     if not data.startswith(b"%PDF"):

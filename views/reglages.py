@@ -1,3 +1,7 @@
+"""Page Réglages : historique, grille de frais, IRVM, dividendes, clé IA, flux RSS."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 from pathlib import Path
 
 import pandas as pd

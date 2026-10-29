@@ -42,10 +42,12 @@ def fingerprint(title: str) -> str:
 
 
 def _clean_html(s: str) -> str:
-    return BeautifulSoup(s or "", "html.parser").get_text(" ", strip=True)
+    """Texte brut d'un fragment HTML (vide si `s` est vide)."""
+    return str(BeautifulSoup(s or "", "html.parser").get_text(" ", strip=True))
 
 
 def _published(entry: Any) -> str:
+    """Date de publication d'une entrée RSS au format ISO (UTC) ; maintenant si le flux n'en donne pas."""
     for k in ("published_parsed", "updated_parsed"):
         v = entry.get(k)
         if v:
@@ -54,7 +56,7 @@ def _published(entry: Any) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_feed(feed: dict) -> list[dict]:
+def fetch_feed(feed: dict[str, Any]) -> list[dict[str, Any]]:
     """Articles d'un flux RSS (au plus MAX_ENTRIES_PER_FEED). Lève requests.RequestException / ValueError."""
     missing = FEED_KEYS - set(feed)
     if missing:
@@ -85,7 +87,22 @@ def fetch_feed(feed: dict) -> list[dict]:
     return items
 
 
-def collect(workers: int = 6, progress: Progress | None = None) -> dict:
+NEWS_COLUMNS = ("url", "title", "source", "query", "published", "content", "scope", "theme")
+
+
+def _new_rows(items: list[dict[str, Any]], known_fp: set[str]) -> list[tuple[Any, ...]]:
+    """Lignes à insérer pour les articles dont l'empreinte est inconnue ; `known_fp` reçoit les nouvelles empreintes."""
+    rows = []
+    for it in items:
+        fp = fingerprint(it["title"])
+        if fp in known_fp:
+            continue
+        known_fp.add(fp)  # DÉROGATION règle 9 : l'ensemble des empreintes est partagé exprès entre les flux d'un même passage
+        rows.append((it["url"], fp, *(it[c] for c in NEWS_COLUMNS[1:])))
+    return rows
+
+
+def collect(workers: int = 6, progress: Progress | None = None) -> dict[str, Any]:
     """Lit tous les flux, dédoublonne par empreinte de titre et enregistre les nouveaux articles."""
     if not 1 <= workers <= MAX_WORKERS:
         raise ValueError(f"workers entre 1 et {MAX_WORKERS} (reçu {workers})")
@@ -100,24 +117,7 @@ def collect(workers: int = 6, progress: Progress | None = None) -> dict:
         for i, fut in enumerate(as_completed(futs), 1):
             f = futs[fut]
             try:
-                for it in fut.result():
-                    fp = fingerprint(it["title"])
-                    if fp in known_fp:
-                        continue
-                    known_fp.add(fp)
-                    rows.append(
-                        (
-                            it["url"],
-                            fp,
-                            it["title"],
-                            it["source"],
-                            it["query"],
-                            it["published"],
-                            it["content"],
-                            it["scope"],
-                            it["theme"],
-                        )
-                    )
+                rows += _new_rows(fut.result(), known_fp)
             except (requests.RequestException, ValueError, KeyError) as e:
                 errors.append(f"{f['query'] or f['url']}: {e}")
             if progress:
@@ -135,7 +135,7 @@ def collect(workers: int = 6, progress: Progress | None = None) -> dict:
     return {"feeds": len(feeds), "new": new, "errors": errors}
 
 
-def collect_market_factors(period: str = "5y") -> dict:
+def collect_market_factors(period: str = "5y") -> dict[str, Any]:
     """Indicateurs chiffrés quotidiens via yfinance (facultatif)."""
     if period not in FACTOR_PERIODS:
         raise ValueError(f"période inconnue {period!r}, attendue parmi {sorted(FACTOR_PERIODS)}")

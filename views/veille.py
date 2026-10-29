@@ -1,3 +1,7 @@
+"""Page Veille : actualités collectées par les bots et leur impact par action."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st

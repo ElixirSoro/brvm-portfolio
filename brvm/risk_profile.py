@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import math
 
 # (question, [(réponse, points 0..4)])
@@ -75,6 +77,7 @@ def score_to_lambda(score_pct: float) -> float:
 
 
 def profile_from_score(score_pct: float) -> tuple[str, str]:
+    """Nom et description du profil de risque correspondant à un score entre 0 et 1."""
     name, desc = PROFILES[0][1], PROFILES[0][2]
     for threshold, n, d in PROFILES:
         if score_pct >= threshold:
@@ -82,7 +85,7 @@ def profile_from_score(score_pct: float) -> tuple[str, str]:
     return name, desc
 
 
-def evaluate(answers: list[int]) -> dict:
+def evaluate(answers: list[int]) -> dict[str, Any]:
     """answers = points choisis pour chaque question (une réponse par question, dans l'ordre)."""
     if len(answers) != len(QUESTIONS):
         raise ValueError(f"{len(QUESTIONS)} réponses attendues (reçu {len(answers)})")

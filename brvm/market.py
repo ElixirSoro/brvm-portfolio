@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import date, timedelta
 
 import numpy as np
@@ -11,10 +13,12 @@ from . import config, db, universe
 
 
 def securities() -> pd.DataFrame:
+    """Les 48 valeurs (nom, secteur, pays, ticker Sika), indexées par ticker."""
     return db.df("SELECT * FROM securities ORDER BY ticker").set_index("ticker")
 
 
 def _split_factors() -> pd.DataFrame:
+    """Opérations sur titres (fractionnements) enregistrées."""
     return db.df("SELECT ticker, date, ratio FROM corporate_actions")
 
 
@@ -23,7 +27,7 @@ def close_panel(years: float | None = None, adjusted: bool = True, tickers: list
     if years is not None and years <= 0:
         raise ValueError(f"nombre d'années positif attendu (reçu {years})")
     q = "SELECT ticker, date, close FROM prices"
-    params: tuple = ()
+    params: tuple[Any, ...] = ()
     if years:
         q += " WHERE date >= ?"
         params = ((date.today() - timedelta(days=int(365.25 * years))).isoformat(),)
@@ -101,6 +105,7 @@ def latest_quotes() -> pd.DataFrame:
 
 
 def dividend_table() -> pd.DataFrame:
+    """Calendrier des dividendes (net, brut, dates de détachement et de paiement)."""
     d = db.df("SELECT * FROM dividends")
     if d.empty:
         return d
@@ -118,6 +123,7 @@ def dividend_table() -> pd.DataFrame:
 
 
 def dividend_yields(last_prices: pd.Series) -> pd.DataFrame:
+    """Rendement net du dernier dividende de chaque valeur aux cours `last_prices`."""
     d = dividend_table()
     out = pd.DataFrame(index=last_prices.index)
     if d.empty:
@@ -138,10 +144,12 @@ def weekly_returns(years: float = 5, tickers: list[str] | None = None) -> pd.Dat
 
 
 def monthly_returns(years: float = 10, tickers: list[str] | None = None) -> pd.DataFrame:
+    """Rendements mensuels simples sur `years` ans (valeurs manquantes reportées 2 mois au plus)."""
     panel = close_panel(years=years, tickers=tickers)
     monthly = panel.resample("ME").last().ffill(limit=2)
     return monthly.pct_change().iloc[1:]
 
 
 def has_data() -> bool:
+    """Vrai si la base contient au moins un cours."""
     return not db.df("SELECT 1 FROM prices LIMIT 1").empty

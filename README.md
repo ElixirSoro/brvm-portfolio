@@ -83,15 +83,17 @@ tests/                  98 tests (données synthétiques, extraits réels de BOC
 ## Fiabilité du code
 
 Le code suit les règles NASA/JPL « Power of 10 » adaptées à Python (skill `code-fiable-nasa`) :
-boucles bornées, pas de récursion, fonctions de 60 lignes et 5 paramètres au plus, erreurs explicites
-(jamais `except Exception`), journalisation plutôt que `print`, constantes nommées, typage complet,
-`ruff` et `mypy` sans avertissement. `tests/test_conformite.py` vérifie automatiquement les règles
-mesurables à chaque `pytest`.
+boucles bornées, pas de récursion, fonctions de 60 lignes et 5 paramètres au plus, 3 niveaux
+d'imbrication au plus, aucun argument modifié, erreurs explicites (jamais `except Exception`),
+journalisation plutôt que `print`, constantes nommées, typage et docstrings complets,
+`ruff` et `mypy --strict` sans avertissement. `tests/test_conformite.py` vérifie automatiquement
+les règles mesurables à chaque `pytest`.
 
-Dérogations assumées :
+Dérogations, signalées dans le code par `# DÉROGATION règle N` :
 
-- **Densité d'assertions** : la règle demande 2 contrôles par fonction en moyenne ; le code en compte environ 0,6.
-  Les contrôles sont concentrés sur les entrées publiques (calculs, lecture de documents, réseau) ; les petites
-  fonctions d'affichage et d'accès à la base n'en ont pas.
-- **Pages Streamlit** (`views/`) : scripts exécutés de haut en bas, donc hors du découpage en fonctions.
-- **pandas / scipy** : allocation dynamique et typage partiel inhérents à ces bibliothèques.
+- **Règle 5, densité de contrôles** : environ 0,6 contrôle par fonction au lieu de 2. Ils portent sur
+  les entrées publiques et les invariants de sortie ; les petites fonctions d'accès à la base et de
+  mise en forme n'en reçoivent pas d'artificiels (`brvm/__init__.py`).
+- **Règle 4, pages Streamlit** (`views/`) : scripts exécutés de haut en bas ; la logique est dans `brvm/`.
+- **Règle 10, décorateurs de cache Streamlit** : non annotés par Streamlit, d'où un `type: ignore` justifié sur chacun.
+- **Règle 9, veille** : l'ensemble des empreintes d'articles est partagé exprès entre les flux d'un même passage.

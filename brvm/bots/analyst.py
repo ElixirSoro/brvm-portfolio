@@ -80,18 +80,24 @@ NEG_WORDS = [
 
 
 def _norm(s: str) -> str:
+    """Texte en majuscules sans accents, pour la recherche de mots-clés."""
     s = unicodedata.normalize("NFKD", (s or "").lower())
     return "".join(c for c in s if not unicodedata.combining(c))
 
 
 def _direction(text: str) -> int:
+    """Sens d'un texte d'après les mots-clés : +1 positif, -1 négatif, 0 neutre ou ambigu."""
     t = _norm(text)
     pos = sum(t.count(_norm(w)) for w in POS_WORDS)
     neg = sum(t.count(_norm(w)) for w in NEG_WORDS)
     return (pos > neg) - (neg > pos)
 
 
-def keyword_analysis(article: dict) -> dict:
+def keyword_analysis(article: dict[str, Any]) -> dict[str, Any]:
+    """Analyse sans IA d'un article : actions citées et actions exposées au thème, score de -2 à +2.
+
+    Pré : `article` contient au moins `title`. Post : scores dans [-2, 2], confiances dans [0, 1].
+    """
     text = f"{article['title']} {article.get('content') or ''}"
     nt = _norm(text)
     direction = _direction(text)
@@ -121,6 +127,9 @@ def keyword_analysis(article: dict) -> dict:
 MAX_BATCH = 20
 MAX_PENDING = 1000
 CONTENT_CHARS_AI = 800
+MAX_SCORE = 2
+DEFAULT_AI_CONFIDENCE = 0.5
+AI_MAX_TOKENS = 4000
 
 
 def _ai_errors() -> tuple[type[BaseException], ...]:
@@ -134,6 +143,7 @@ def _ai_errors() -> tuple[type[BaseException], ...]:
 
 
 def _client() -> Any:
+    """Client de l'API Claude, ou None si aucune clé n'est configurée."""
     if not config.ANTHROPIC_API_KEY:
         return None
     try:
@@ -143,7 +153,7 @@ def _client() -> Any:
     return anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
 
-def _parse_json(text: str) -> list[dict]:
+def _parse_json(text: str) -> list[dict[str, Any]]:
     """Tableau JSON contenu dans la réponse de l'IA. Lève ValueError s'il est absent ou mal formé."""
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
     start, end = text.find("["), text.rfind("]")
@@ -155,7 +165,25 @@ def _parse_json(text: str) -> list[dict]:
     return data
 
 
-def ai_analysis(client: Any, batch: list[dict]) -> dict[int, dict]:
+def _ai_impacts(item: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Impacts d'un article renvoyés par l'IA, limités aux tickers connus et aux scores [-MAX_SCORE, MAX_SCORE]."""
+    valid = set(exposures.EXPOSURES)
+    impacts: dict[str, dict[str, Any]] = {}
+    for imp in item.get("impacts", []):
+        t = str(imp.get("ticker", "")).upper()
+        if t not in valid:
+            continue
+        impacts[t] = {
+            "score": max(-MAX_SCORE, min(MAX_SCORE, int(imp.get("score", 0)))),
+            "confidence": float(imp.get("confiance", DEFAULT_AI_CONFIDENCE)),
+            "horizon": imp.get("horizon", "moyen"),
+            "rationale": imp.get("raison", ""),
+        }
+    assert all(abs(v["score"]) <= MAX_SCORE for v in impacts.values())
+    return impacts
+
+
+def ai_analysis(client: Any, batch: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
     """Analyse d'un lot d'articles par l'IA : résumé, catégorie, portée, impacts bornés à [-2, 2]."""
     if not 1 <= len(batch) <= MAX_BATCH:
         raise ValueError(f"lot de 1 à {MAX_BATCH} articles attendu (reçu {len(batch)})")
@@ -166,7 +194,7 @@ def ai_analysis(client: Any, batch: list[dict]) -> dict[int, dict]:
     )
     msg = client.messages.create(
         model=config.ANTHROPIC_MODEL,
-        max_tokens=4000,
+        max_tokens=AI_MAX_TOKENS,
         system=SYSTEM,
         messages=[
             {
@@ -178,19 +206,8 @@ def ai_analysis(client: Any, batch: list[dict]) -> dict[int, dict]:
     )
     data = _parse_json("".join(b.text for b in msg.content if getattr(b, "type", "") == "text"))
     out = {}
-    valid = set(exposures.EXPOSURES)
     for item in data:
-        impacts = {}
-        if item.get("pertinent"):
-            for imp in item.get("impacts", []):
-                t = str(imp.get("ticker", "")).upper()
-                if t in valid:
-                    impacts[t] = {
-                        "score": max(-2, min(2, int(imp.get("score", 0)))),
-                        "confidence": float(imp.get("confiance", 0.5)),
-                        "horizon": imp.get("horizon", "moyen"),
-                        "rationale": imp.get("raison", ""),
-                    }
+        impacts = _ai_impacts(item) if item.get("pertinent") else {}
         out[int(item["id"])] = {
             "summary": item.get("resume"),
             "category": item.get("categorie"),
@@ -201,7 +218,7 @@ def ai_analysis(client: Any, batch: list[dict]) -> dict[int, dict]:
     return out
 
 
-def analyze_pending(limit: int = 120, batch_size: int = 10, progress: Progress | None = None) -> dict:
+def analyze_pending(limit: int = 120, batch_size: int = 10, progress: Progress | None = None) -> dict[str, Any]:
     """Analyse les articles non encore notés (IA si clé, sinon mots-clés)."""
     if not 1 <= limit <= MAX_PENDING or not 1 <= batch_size <= MAX_BATCH:
         raise ValueError(f"limit 1..{MAX_PENDING} et batch_size 1..{MAX_BATCH} (reçu {limit}, {batch_size})")
@@ -213,7 +230,7 @@ def analyze_pending(limit: int = 120, batch_size: int = 10, progress: Progress |
     done, ai, errors = 0, 0, []
     for i in range(0, len(pending), batch_size):
         batch = pending[i : i + batch_size]
-        results: dict[int, dict] = {}
+        results: dict[int, dict[str, Any]] = {}
         if client:
             try:
                 results = ai_analysis(client, batch)

@@ -1,3 +1,7 @@
+"""Page Simulations : projections Monte-Carlo du plan d'épargne."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st

@@ -6,6 +6,8 @@ Secteurs : classification BRVM simplifiée.
 
 from __future__ import annotations
 
+from typing import Any
+
 COUNTRY_NAMES = {
     "ci": "Côte d'Ivoire",
     "sn": "Sénégal",
@@ -78,8 +80,10 @@ CORPORATE_ACTIONS = [
 
 
 def sika_ticker(ticker: str, country: str) -> str:
+    """Ticker Sika Finance d'une valeur (suffixe pays)."""
     return f"{ticker}.{country}"
 
 
-def by_ticker() -> dict[str, dict]:
+def by_ticker() -> dict[str, dict[str, Any]]:
+    """Les 48 valeurs indexées par ticker."""
     return {t: {"ticker": t, "name": n, "country": c, "sector": s, "sika": sika_ticker(t, c)} for t, n, c, s in SECURITIES}

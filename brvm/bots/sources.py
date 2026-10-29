@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from urllib.parse import quote_plus
 
 from .. import config
@@ -35,10 +37,12 @@ DEFAULT_RSS = """# Flux RSS supplémentaires (une URL par ligne). Vérifiez qu'i
 
 
 def _is_english(q: str) -> bool:
+    """Vrai si la requête de recherche vise la presse anglophone."""
     return all(ord(c) < 128 for c in q) and any(w in q.lower() for w in ("price", "prices", "rates", "oil", "rubber", "decision"))
 
 
-def google_news_feeds() -> list[dict]:
+def google_news_feeds() -> list[dict[str, Any]]:
+    """Flux Google Actualités construits à partir des requêtes de la carte des facteurs."""
     feeds = []
     for code, f in FACTORS.items():
         for q in f["queries"]:
@@ -67,7 +71,8 @@ def google_news_feeds() -> list[dict]:
     return feeds
 
 
-def extra_feeds() -> list[dict]:
+def extra_feeds() -> list[dict[str, Any]]:
+    """Flux RSS ajoutés par l'utilisateur dans data/sources_rss.txt (créé avec les flux par défaut)."""
     if not RSS_FILE.exists():
         RSS_FILE.write_text(DEFAULT_RSS, encoding="utf-8")
     out = []
@@ -78,5 +83,6 @@ def extra_feeds() -> list[dict]:
     return out
 
 
-def all_feeds() -> list[dict]:
+def all_feeds() -> list[dict[str, Any]]:
+    """Tous les flux à lire : Google Actualités puis flux supplémentaires."""
     return google_news_feeds() + extra_feeds()

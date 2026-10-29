@@ -1,3 +1,7 @@
+"""Page Mon portefeuille : copie virtuelle du portefeuille réel, frais et dividendes compris."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import sqlite3
 from datetime import date
 
@@ -86,8 +90,9 @@ with tab_pos:
             "sont converties en actions actuelles."
         )
 
-        @st.cache_data(ttl=600, show_spinner="Reconstitution de l'historique…")
-        def hist(p: int, n_tx: int):
+        @st.cache_data(ttl=600, show_spinner="Reconstitution de l'historique…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+        def hist(p: int, n_tx: int) -> pd.DataFrame:
+            """Historique du portefeuille ; `n_tx` invalide le cache quand une opération est ajoutée."""
             return portfolio.history(p)
 
         h = hist(pid, len(portfolio.transactions(pid)))

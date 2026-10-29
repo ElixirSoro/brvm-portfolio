@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS financials (
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
+    """Connexion SQLite (lignes accessibles par nom de colonne)."""
     con = sqlite3.connect(str(path or config.DB_PATH), check_same_thread=False, timeout=30)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
@@ -85,6 +86,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 
 @contextmanager
 def session(path: Path | None = None) -> Iterator[sqlite3.Connection]:
+    """Connexion validée à la sortie du bloc et toujours fermée, même en cas d'erreur."""
     con = connect(path)
     try:
         yield con
@@ -94,6 +96,7 @@ def session(path: Path | None = None) -> Iterator[sqlite3.Connection]:
 
 
 def init(path: Path | None = None) -> None:
+    """Crée les tables manquantes et charge l'univers des 48 valeurs et les opérations sur titres."""
     with session(path) as con:
         con.executescript(SCHEMA)
         con.executemany(
@@ -103,37 +106,44 @@ def init(path: Path | None = None) -> None:
         con.executemany("INSERT OR IGNORE INTO corporate_actions VALUES (?,?,?)", universe.CORPORATE_ACTIONS)
 
 
-def df(sql: str, params: tuple = (), path: Path | None = None) -> pd.DataFrame:
+def df(sql: str, params: tuple[Any, ...] = (), path: Path | None = None) -> pd.DataFrame:
+    """Résultat d'une requête paramétrée sous forme de DataFrame."""
     with session(path) as con:
         return pd.read_sql_query(sql, con, params=params)
 
 
-def execute(sql: str, params: tuple = (), path: Path | None = None) -> int:
+def execute(sql: str, params: tuple[Any, ...] = (), path: Path | None = None) -> int:
+    """Exécute une requête paramétrée ; renvoie l'identifiant de la dernière ligne insérée (0 sinon)."""
     with session(path) as con:
         cur = con.execute(sql, params)
         return cur.lastrowid or 0
 
 
-def executemany(sql: str, rows: list[tuple], path: Path | None = None) -> None:
+def executemany(sql: str, rows: list[tuple[Any, ...]], path: Path | None = None) -> None:
+    """Exécute une requête paramétrée pour chaque ligne de `rows`, dans une seule transaction."""
     with session(path) as con:
         con.executemany(sql, rows)
 
 
 def get_setting(key: str, default: Any = None, path: Path | None = None) -> Any:
+    """Réglage enregistré (JSON), ou `default` s'il n'existe pas."""
     with session(path) as con:
         row = con.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return json.loads(row["value"]) if row else default
 
 
 def set_setting(key: str, value: Any, path: Path | None = None) -> None:
+    """Enregistre un réglage (sérialisé en JSON)."""
     execute("INSERT OR REPLACE INTO settings VALUES (?,?)", (key, json.dumps(value)), path)
 
 
 def mark_update(what: str, path: Path | None = None) -> None:
+    """Horodate la dernière mise à jour d'un type de données (cours, veille, BOC…)."""
     execute("INSERT OR REPLACE INTO updates VALUES (?, datetime('now'))", (what,), path)
 
 
 def last_update(what: str, path: Path | None = None) -> str | None:
+    """Horodatage de la dernière mise à jour d'un type de données, ou None."""
     with session(path) as con:
         row = con.execute("SELECT at FROM updates WHERE what=?", (what,)).fetchone()
     return row["at"] if row else None

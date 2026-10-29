@@ -11,6 +11,8 @@ Contrat
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import random
 import time
@@ -51,12 +53,17 @@ class SikaError(RuntimeError):
 
 
 def _session() -> requests.Session:
+    """Session HTTP avec l'en-tête navigateur attendu par le site."""
     s = requests.Session()
     s.headers.update({"User-Agent": USER_AGENT})
     return s
 
 
-def _post_once(session: requests.Session, payload: dict) -> list[dict]:
+def _post_once(session: requests.Session, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Un appel à l'API GetHistos ; liste vide si Sika n'a pas de données.
+
+    Lève SikaError (HTTP 403/429 ou erreur renvoyée), requests.HTTPError, ValueError (JSON invalide).
+    """
     r = session.post(API_URL, json=payload, headers=HEADERS, timeout=TIMEOUT_S)
     if r.status_code in (403, 429):
         raise SikaError(f"HTTP {r.status_code}")
@@ -73,7 +80,7 @@ def _post_once(session: requests.Session, payload: dict) -> list[dict]:
     return [] if lst == "" else list(lst)
 
 
-def fetch_period(session: requests.Session, sika_ticker: str, start: date, end: date) -> list[dict]:
+def fetch_period(session: requests.Session, sika_ticker: str, start: date, end: date) -> list[dict[str, Any]]:
     """Séances d'un titre entre deux dates (fenêtre ≤ WINDOW_DAYS conseillée), avec essais bornés."""
     if not sika_ticker:
         raise ValueError("ticker Sika vide")
@@ -90,7 +97,8 @@ def fetch_period(session: requests.Session, sika_ticker: str, start: date, end: 
     raise SikaError(f"{sika_ticker} {start}->{end} après {MAX_RETRIES} essais : {last}")
 
 
-def _to_row(item: dict) -> Row | None:
+def _to_row(item: dict[str, Any]) -> Row | None:
+    """Convertit une séance Sika en tuple (date ISO, ouv., haut, bas, clôture, volume) ; None si la date est illisible."""
     try:
         day = datetime.strptime(str(item["Date"]), "%d/%m/%Y").date().isoformat()
     except (KeyError, ValueError):
@@ -123,12 +131,14 @@ def fetch_history(
 
 
 def _store(ticker: str, rows: list[Row]) -> int:
+    """Écrit les séances ayant une clôture dans `prices` ; renvoie le nombre de lignes écrites."""
     clean = [(ticker, *r) for r in rows if r[4] is not None]
     db.executemany("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?,?,?)", clean)
     return len(clean)
 
 
 def _targets(tickers: list[str] | None) -> list[tuple[str, str]]:
+    """Couples (ticker, ticker Sika) à télécharger ; ValueError si aucun ticker n'est reconnu."""
     secs = universe.by_ticker()
     out = [(t, s["sika"]) for t, s in secs.items() if not tickers or t in tickers]
     out += [(t, t) for t in universe.INDEX_TICKERS if not tickers or t in tickers]
@@ -137,16 +147,19 @@ def _targets(tickers: list[str] | None) -> list[tuple[str, str]]:
     return out
 
 
-def update_history(years: int = 10, tickers: list[str] | None = None, workers: int = 5, progress: Progress | None = None) -> dict:
+def update_history(
+    years: int = 10, tickers: list[str] | None = None, workers: int = 5, progress: Progress | None = None
+) -> dict[str, Any]:
     """Télécharge l'historique manquant (depuis la dernière date en base) pour chaque titre et indice."""
     if not 1 <= years <= MAX_YEARS:
         raise ValueError(f"années entre 1 et {MAX_YEARS} (reçu {years})")
     targets = _targets(tickers)
     last = db.df("SELECT ticker, MAX(date) AS last FROM prices GROUP BY ticker").set_index("ticker")["last"].to_dict()
     today, s = date.today(), _session()
-    report: dict = {"ok": 0, "rows": 0, "errors": []}
+    report: dict[str, Any] = {"ok": 0, "rows": 0, "errors": []}
 
     def start_of(t: str) -> date:
+        """Date de début du téléchargement : dernière date en base moins 5 jours, sinon `years` ans en arrière."""
         return date.fromisoformat(last[t]) - timedelta(days=5) if t in last else today - timedelta(days=365 * years)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -164,11 +177,11 @@ def update_history(years: int = 10, tickers: list[str] | None = None, workers: i
     return report
 
 
-def refresh_quotes(progress: Progress | None = None) -> dict:
+def refresh_quotes(progress: Progress | None = None) -> dict[str, Any]:
     """Cours de la séance : re-télécharge les QUOTE_LOOKBACK_DAYS derniers jours de chaque titre."""
     targets = _targets(None)
     today, s = date.today(), _session()
-    report: dict = {"ok": 0, "errors": []}
+    report: dict[str, Any] = {"ok": 0, "errors": []}
     with ThreadPoolExecutor(max_workers=8) as pool:
         futs = {pool.submit(fetch_period, s, sk, today - timedelta(days=QUOTE_LOOKBACK_DAYS), today): t for t, sk in targets}
         for i, f in enumerate(as_completed(futs), 1):

@@ -13,11 +13,12 @@ select = ["E", "F", "W", "B", "UP", "C4", "SIM", "PLE", "PLW", "RUF", "BLE"]
 ignore = ["RUF001", "RUF002", "RUF003"]   # caractères typographiques français (’, « », espaces fines) voulus
 
 [tool.mypy]
+files = ["brvm", "views", "app.py"]
 python_version = "3.10"
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
-check_untyped_defs = true
+strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

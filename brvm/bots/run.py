@@ -48,6 +48,7 @@ def in_session(now: datetime) -> bool:
 
 
 def news_cycle() -> None:
+    """Cycle de veille : collecte des flux puis analyse des nouveaux articles."""
     r = collector.collect()
     log.info("Veille : %s nouveaux articles sur %s flux (%s erreurs)", r["new"], r["feeds"], len(r["errors"]))
     a = analyst.analyze_pending()
@@ -57,16 +58,19 @@ def news_cycle() -> None:
 
 
 def quotes_cycle() -> None:
+    """Cycle des cours : Sika Finance, puis brvm.org en secours."""
     r = quotes.refresh()
     log.info("Cours : %s valeurs à jour · source %s", r["ok"], r["source"])
 
 
 def factors_cycle() -> None:
+    """Cycle des indicateurs exogènes chiffrés (matières premières, change, taux)."""
     r = collector.collect_market_factors(period="1mo")
     log.info("Indicateurs : %s séries (%s erreurs)", r["ok"], len(r["errors"]))
 
 
 def boc_cycle() -> None:
+    """Cycle des Bulletins officiels de la cote : importe les deux derniers absents de la base."""
     r = documents.import_latest_bocs(2)
     log.info("BOC : %s importé(s)", len(r["imported"]))
     for e in r["errors"]:
@@ -74,6 +78,7 @@ def boc_cycle() -> None:
 
 
 def reports_cycle() -> None:
+    """Cycle des rapports : met à jour la liste des rapports des 48 sociétés."""
     r = documents.refresh_reports([t for t, *_ in universe.SECURITIES])
     log.info("Rapports des sociétés : %s nouveaux (%s erreurs)", r["new"], len(r["errors"]))
 
@@ -89,6 +94,7 @@ def run_safely(name: str, cycle: Callable[[], None]) -> bool:
 
 
 def due(now: float, last: float, period_s: float) -> bool:
+    """Vrai si au moins `period_s` secondes se sont écoulées depuis `last`."""
     return now - last >= period_s
 
 
@@ -119,6 +125,7 @@ def loop(hours: float, with_quotes: bool) -> None:
 
 
 def main() -> None:
+    """Point d'entrée en ligne de commande : un passage, ou une boucle bornée avec --loop."""
     p = argparse.ArgumentParser(description="Bots BRVM Portfolio")
     p.add_argument("--loop", action="store_true", help="tourner en continu")
     p.add_argument("--hours", type=float, default=168.0, help="durée maximale de la boucle (heures)")

@@ -8,6 +8,8 @@ Contrat
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 from collections.abc import Callable
 from datetime import date
@@ -39,9 +41,9 @@ def store_brvm_session(session_date: date, quotes: pd.DataFrame) -> int:
     return len(rows)
 
 
-def refresh(progress: Progress | None = None) -> dict:
+def refresh(progress: Progress | None = None) -> dict[str, Any]:
     """Rafraîchit les cours. Sika Finance, puis brvm.org si Sika est insuffisant."""
-    sika_report: dict = {"ok": 0, "errors": ["non tenté"]}
+    sika_report: dict[str, Any] = {"ok": 0, "errors": ["non tenté"]}
     try:
         sika_report = sika.refresh_quotes(progress=progress)
     except requests.RequestException as e:

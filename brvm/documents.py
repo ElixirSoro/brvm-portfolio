@@ -35,18 +35,19 @@ log = logging.getLogger(__name__)
 
 
 def _session() -> requests.Session:
+    """Session HTTP avec l'en-tête navigateur attendu par le site."""
     s = requests.Session()
     s.headers.update({"User-Agent": reports.USER_AGENT})
     return s
 
 
 # ---------------------------------------------------------------- BOC
-def fetch_boc_list(pages: int = 1, session: requests.Session | None = None) -> list[tuple]:
+def fetch_boc_list(pages: int = 1, session: requests.Session | None = None) -> list[tuple[Any, ...]]:
     """Liens des BOC publiés (les plus récents d'abord), sur au plus LIST_PAGES_MAX pages."""
     if not 1 <= pages <= LIST_PAGES_MAX:
         raise ValueError(f"pages entre 1 et {LIST_PAGES_MAX} (reçu {pages})")
     s = session or _session()
-    found: dict = {}
+    found: dict[date, str] = {}
     for page in range(pages):
         r = s.get(boc.LIST_URL, params={"page": page} if page else None, timeout=reports.TIMEOUT_S)
         r.raise_for_status()
@@ -54,7 +55,7 @@ def fetch_boc_list(pages: int = 1, session: requests.Session | None = None) -> l
     return sorted(found.items(), reverse=True)
 
 
-def store_boc(session_date: date, equities: pd.DataFrame, market: dict, events: pd.DataFrame, url: str) -> None:
+def store_boc(session_date: date, equities: pd.DataFrame, market: dict[str, Any], events: pd.DataFrame, url: str) -> None:
     """Écrit un BOC lu : cotations officielles (et cours dans `prices`), indices, événements."""
     if equities.empty:
         raise ValueError("aucune cotation à enregistrer")
@@ -101,7 +102,7 @@ def store_boc(session_date: date, equities: pd.DataFrame, market: dict, events: 
     )
 
 
-def import_boc(url: str, session: requests.Session | None = None) -> dict:
+def import_boc(url: str, session: requests.Session | None = None) -> dict[str, Any]:
     """Télécharge, lit et enregistre un BOC."""
     path = reports.download(url, reports.CACHE_DIR / "boc", session)
     pages = boc.pdf_lines(path)
@@ -116,7 +117,7 @@ def import_boc(url: str, session: requests.Session | None = None) -> dict:
     return {"date": session_date.isoformat(), "equities": len(equities), "events": len(events)}
 
 
-def import_latest_bocs(n: int = 5, progress: Progress | None = None) -> dict:
+def import_latest_bocs(n: int = 5, progress: Progress | None = None) -> dict[str, Any]:
     """Importe les n derniers BOC non encore en base."""
     if not 1 <= n <= MAX_BOC_BATCH:
         raise ValueError(f"n entre 1 et {MAX_BOC_BATCH} (reçu {n})")
@@ -137,7 +138,45 @@ def import_latest_bocs(n: int = 5, progress: Progress | None = None) -> dict:
 
 
 # ---------------------------------------------------------------- rapports
-def refresh_reports(tickers: list[str], progress: Progress | None = None) -> dict:
+FINGERPRINT_URL_CHARS = 60
+
+
+def _store_reports(ticker: str, rows: list[dict[str, Any]]) -> int:
+    """Enregistre les rapports d'une société et verse chaque nouveau rapport dans la veille.
+
+    Renvoie le nombre de rapports nouveaux (0 ≤ n ≤ len(rows)).
+    """
+    new = 0
+    with db.session() as con:
+        for r in rows:
+            cur = con.execute(
+                "INSERT OR IGNORE INTO reports (url, ticker, title, kind, period, published) VALUES (?,?,?,?,?,?)",
+                (r["url"], ticker, r["title"], r["kind"], r["period"], r["published"]),
+            )
+            if not cur.rowcount:
+                continue
+            new += 1
+            con.execute(
+                "INSERT OR IGNORE INTO news (url, fingerprint, title, source, query, published, content, "
+                "scope, theme, category) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    r["url"],
+                    "rapport:" + r["url"][-FINGERPRINT_URL_CHARS:],
+                    r["title"],
+                    "brvm.org",
+                    ticker,
+                    r["published"] or "",
+                    "",
+                    "Société",
+                    f"societe:{ticker}",
+                    "endogène",
+                ),
+            )
+    assert 0 <= new <= len(rows)
+    return new
+
+
+def refresh_reports(tickers: list[str], progress: Progress | None = None) -> dict[str, Any]:
     """Met à jour la liste des rapports ; les nouveaux rapports alimentent aussi la veille."""
     if not tickers:
         raise ValueError("au moins un ticker attendu")
@@ -149,30 +188,7 @@ def refresh_reports(tickers: list[str], progress: Progress | None = None) -> dic
         except (requests.RequestException, ValueError) as e:
             errors.append(f"{t} : {e}")
             continue
-        with db.session() as con:
-            for r in rows:
-                cur = con.execute(
-                    "INSERT OR IGNORE INTO reports (url, ticker, title, kind, period, published) VALUES (?,?,?,?,?,?)",
-                    (r["url"], t, r["title"], r["kind"], r["period"], r["published"]),
-                )
-                if cur.rowcount:
-                    new += 1
-                    con.execute(
-                        "INSERT OR IGNORE INTO news (url, fingerprint, title, source, query, published, content, "
-                        "scope, theme, category) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                        (
-                            r["url"],
-                            "rapport:" + r["url"][-60:],
-                            r["title"],
-                            "brvm.org",
-                            t,
-                            r["published"] or "",
-                            "",
-                            "Société",
-                            f"societe:{t}",
-                            "endogène",
-                        ),
-                    )
+        new += _store_reports(t, rows)
         if progress:
             progress(i / len(tickers), t)
     db.mark_update("reports")
@@ -190,6 +206,7 @@ def pdf_text_pages(path: Path) -> list[str]:
 
 
 def _ai_client() -> Any:
+    """Client de l'API Claude, ou None si aucune clé n'est configurée."""
     if not config.ANTHROPIC_API_KEY:
         return None
     import anthropic
@@ -197,7 +214,7 @@ def _ai_client() -> Any:
     return anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
 
-def analyze_report(url: str, use_ai: bool = True) -> dict:
+def analyze_report(url: str, use_ai: bool = True) -> dict[str, Any]:
     """Extrait et enregistre les grands postes d'un rapport. Règles d'abord, IA si scan ou si demandé."""
     row = db.df("SELECT * FROM reports WHERE url=?", (url,))
     if row.empty:
@@ -206,7 +223,7 @@ def analyze_report(url: str, use_ai: bool = True) -> dict:
     path = reports.download(url)
     pages = pdf_text_pages(path)
     client = _ai_client() if use_ai else None
-    meta: dict = {}
+    meta: dict[str, Any] = {}
     if client is not None:
         figures, meta = fin.extract_ai(path, client)
     elif fin.is_scanned(pages):

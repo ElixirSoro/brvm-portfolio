@@ -1,3 +1,7 @@
+"""Page Documents officiels : Bulletins officiels de la cote, états financiers, agenda des émetteurs."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import pandas as pd
 import plotly.graph_objects as go
 import requests
@@ -5,7 +9,7 @@ import streamlit as st
 
 from brvm import config, db, documents, market, ui
 from brvm.analysis import financials as fin
-from brvm.data import boc
+from brvm.data import boc, reports
 
 MAX_PER = 60
 MAX_YIELD = 0.25
@@ -229,6 +233,6 @@ with tab_events:
             height=480,
         )
 st.caption(
-    f"Les PDF téléchargés sont conservés dans {documents.reports.CACHE_DIR}. Lecteur BOC : "
+    f"Les PDF téléchargés sont conservés dans {reports.CACHE_DIR}. Lecteur BOC : "
     f"{boc.MIN_EQUITIES} valeurs minimum par bulletin, sinon le bulletin est refusé."
 )

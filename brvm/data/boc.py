@@ -18,6 +18,8 @@ Contrat
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import math
 import re
@@ -134,8 +136,9 @@ def pdf_lines(path: Path) -> list[list[str]]:
     return pages
 
 
-def _group_lines(words: list[dict]) -> list[str]:
-    lines: list[list[dict]] = []
+def _group_lines(words: list[dict[str, Any]]) -> list[str]:
+    """Reconstitue les lignes d'une page PDF en regroupant les mots par ordonnée (tolérance LINE_TOLERANCE_PT)."""
+    lines: list[list[dict[str, Any]]] = []
     for w in sorted(words, key=lambda w: (round(w["top"], 1), w["x0"])):
         if lines and abs(w["top"] - lines[-1][0]["top"]) <= LINE_TOLERANCE_PT:
             lines[-1].append(w)
@@ -183,9 +186,9 @@ def _choose_trade(groups: list[str], close: float, wrapped: str) -> tuple[float,
     return best
 
 
-def _parse_tail(rest: list[str]) -> dict:
+def _parse_tail(rest: list[str]) -> dict[str, Any]:
     """Variation annuelle, dernier dividende, date, rendement, PER (tous facultatifs)."""
-    out: dict = {"change_ytd": None, "div_net": None, "div_date": None, "yield_net": None, "per": None}
+    out: dict[str, Any] = {"change_ytd": None, "div_net": None, "div_date": None, "yield_net": None, "per": None}
     if len(rest) > 1 and _PCT.fullmatch(rest[0]) and rest[1] == "%":
         out["change_ytd"] = to_float(rest[0]) / 100
         rest = rest[2:]
@@ -205,6 +208,7 @@ def _parse_tail(rest: list[str]) -> dict:
 
 
 def _div_date(token: str) -> str | None:
+    """Date ISO d'un dividende lu dans le BOC (jour, mois abrégé, année sur 2 chiffres) ; None si illisible."""
     m = _DIV_DATE.fullmatch(token)
     if not m:
         return None
@@ -256,7 +260,7 @@ def parse_equity_line(line: str, continuation: str = "") -> EquityQuote | None:
 
 def parse_equities(pages: list[list[str]]) -> pd.DataFrame:
     """Toutes les lignes de cotation d'actions du BOC."""
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for lines in pages:
         for i, line in enumerate(lines):
             nxt = lines[i + 1] if i + 1 < len(lines) else ""
@@ -275,7 +279,7 @@ def parse_equities(pages: list[list[str]]) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- marché et événements
-def parse_market(page1: list[str]) -> dict:
+def parse_market(page1: list[str]) -> dict[str, Any]:
     """Indices du jour et indicateurs du marché (page 1 du BOC)."""
     text = " ".join(page1)
     m = re.search(r"BRVM COMPOSITE ([\d ,]+?) BRVM 30 ([\d ,]+?) BRVM PRESTIGE ([\d ,]+?)(?: [A-Z]|$)", text)
@@ -298,6 +302,7 @@ _COMMUNIQUE = re.compile(r"^(.+?) (\d{8}(?:-\d+)?) (.+)$")
 
 
 def _kind(text: str) -> str:
+    """Nature d'un communiqué du BOC : états financiers, rapport d'activités, dividende, assemblée, sinon communiqué."""
     t = issuers.normalize(text)
     for key, kind in (
         ("ETATS FINANCIERS", "etats_financiers"),
@@ -313,7 +318,7 @@ def _kind(text: str) -> str:
 
 def parse_events(pages: list[list[str]], session: date) -> pd.DataFrame:
     """Communiqués des émetteurs et calendrier des assemblées générales."""
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for lines in pages:
         for line in lines:
             m = _MEETING.match(line)

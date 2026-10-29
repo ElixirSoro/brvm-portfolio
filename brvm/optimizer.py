@@ -10,6 +10,8 @@ Un actif « Obligations » (rendement fixe, faible volatilité) est ajouté : λ
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -19,6 +21,11 @@ from scipy.optimize import minimize
 from . import config, fees as fees_mod, market
 
 BOND = "OBLIG"
+MIN_COVERAGE = 0.7  # part minimale des semaines avec un cours
+MIN_ASSETS = 2
+WEEKS_PER_YEAR = 52
+MAX_YIELD_USED = 0.15  # rendement en dividende plafonné (dividendes exceptionnels)
+MU_BOUNDS = (-0.05, 0.25)  # rendement espéré annuel borné
 MAX_PRUNE_ROUNDS = 6  # ré-optimisations successives après retrait des lignes trop petites
 SLSQP_MAXITER = 500
 SLSQP_FTOL = 1e-10
@@ -58,23 +65,28 @@ class Inputs:
     sectors: pd.Series
     prices: pd.Series
     yields: pd.Series
-    excluded: dict = field(default_factory=dict)
+    excluded: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 def estimate(
-    params: dict | None = None,
+    params: dict[str, Any] | None = None,
     returns: pd.DataFrame | None = None,
     quotes: pd.DataFrame | None = None,
     signals: pd.Series | None = None,
 ) -> Inputs:
+    """Entrées de l'optimiseur : rendements espérés, covariance rétrécie, secteurs, cours et rendements.
+
+    Les valeurs trop peu liquides ou à historique trop court sont exclues (motif dans `excluded`).
+    Lève ValueError si moins de 2 valeurs restent éligibles.
+    """
     p = {**config.DEFAULT_OPTIM, **(params or {})}
     rets = returns if returns is not None else market.weekly_returns(years=p["history_years"])
     q = quotes if quotes is not None else market.latest_quotes()
-    excluded = {}
-    keep = []
+    excluded: dict[str, str] = {}
+    keep: list[str] = []
     for t in rets.columns:
         coverage = rets[t].notna().mean()
-        if coverage < 0.7:
+        if coverage < MIN_COVERAGE:
             excluded[t] = f"historique trop court ({coverage:.0%} des semaines)"
             continue
         adv = q["avg_daily_value"].get(t, np.nan) if not q.empty else np.nan
@@ -85,23 +97,27 @@ def estimate(
             excluded[t] = "pas de cours récent"
             continue
         keep.append(t)
+    if len(keep) < MIN_ASSETS:
+        raise ValueError(f"{len(keep)} valeur(s) éligible(s) : au moins {MIN_ASSETS} nécessaires (importe l'historique)")
     r = rets[keep].fillna(0.0)
-    m = r.mean() * 52
-    v = r.var() * 52
+    m = r.mean() * WEEKS_PER_YEAR
+    v = r.var() * WEEKS_PER_YEAR
     price_ret = np.exp(m + v / 2) - 1
     # rétrécissement vers un rendement de cours de long terme : les années exceptionnelles (2024-2026)
     # ne sont pas extrapolées sur 10 ans
     shrunk = (1 - p["shrinkage"]) * price_ret + p["shrinkage"] * p["price_prior"]
-    y = q["yield_net"].reindex(keep).fillna(0.0).clip(0, 0.15)
-    mu = (shrunk + y).clip(-0.05, 0.25)
+    y = q["yield_net"].reindex(keep).fillna(0.0).clip(0, MAX_YIELD_USED)
+    mu = (shrunk + y).clip(*MU_BOUNDS)
     if signals is not None and p.get("signal_tilt", 0):
         mu = mu + p["signal_tilt"] * signals.reindex(keep).fillna(0.0) / 2  # signal −2..+2 → ±tilt
-    cov = pd.DataFrame(shrunk_cov(r.values) * 52, index=keep, columns=keep)
+    cov = pd.DataFrame(shrunk_cov(r.values) * WEEKS_PER_YEAR, index=keep, columns=keep)
+    assert np.isfinite(mu).all() and np.isfinite(cov.values).all()
     secs = market.securities()
     return Inputs(keep, mu, cov, secs["sector"].reindex(keep), q["last"].reindex(keep), y, excluded)
 
 
-def _with_bond(inp: Inputs, p: dict) -> tuple[list[str], np.ndarray, np.ndarray, pd.Series]:
+def _with_bond(inp: Inputs, p: dict[str, Any]) -> tuple[list[str], np.ndarray, np.ndarray, pd.Series]:
+    """Ajoute la poche obligataire (rendement fixe, variance nulle) aux entrées de l'optimiseur."""
     names = [*inp.tickers, BOND]
     mu = np.append(inp.mu.values, p["bond_return"])
     n = len(names)
@@ -112,7 +128,12 @@ def _with_bond(inp: Inputs, p: dict) -> tuple[list[str], np.ndarray, np.ndarray,
     return names, mu, cov, sectors
 
 
-def optimize(inp: Inputs, lam: float, params: dict | None = None, allow_bonds: bool = True) -> pd.Series:
+def optimize(inp: Inputs, lam: float, params: dict[str, Any] | None = None, allow_bonds: bool = True) -> pd.Series:
+    """Poids moyenne-variance maximisant mu·w - λ/2·wᵀΣw sous contraintes (poids, secteurs, obligations).
+
+    Pré : λ > 0, au moins une action éligible. Post : poids ≥ 0, somme = 1.
+    Lève ValueError si les entrées sont invalides ou sans solution admissible.
+    """
     if not lam > 0:
         raise ValueError(f"aversion au risque λ strictement positive attendue (reçu {lam})")
     if not inp.tickers:
@@ -162,7 +183,8 @@ def optimize(inp: Inputs, lam: float, params: dict | None = None, allow_bonds: b
     return w
 
 
-def stats(w: pd.Series, inp: Inputs, params: dict | None = None) -> dict:
+def stats(w: pd.Series, inp: Inputs, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Rendement espéré, volatilité, Sharpe, rendement en dividende, part actions et nombre de lignes d'un portefeuille."""
     p = {**config.DEFAULT_OPTIM, **(params or {})}
     names, mu, cov, _ = _with_bond(inp, p)
     if not set(w.index) <= set(names):
@@ -182,7 +204,7 @@ def stats(w: pd.Series, inp: Inputs, params: dict | None = None) -> dict:
     }
 
 
-def frontier(inp: Inputs, params: dict | None = None, points: int = 25) -> pd.DataFrame:
+def frontier(inp: Inputs, params: dict[str, Any] | None = None, points: int = 25) -> pd.DataFrame:
     """Frontière efficiente : une optimisation par valeur de λ entre FRONTIER_LAMBDAS."""
     if not 2 <= points <= MAX_FRONTIER_POINTS:
         raise ValueError(f"points entre 2 et {MAX_FRONTIER_POINTS} (reçu {points})")
@@ -201,8 +223,12 @@ def frontier(inp: Inputs, params: dict | None = None, points: int = 25) -> pd.Da
     return pd.DataFrame(rows)
 
 
-def _round_down(qty: pd.Series, prices: pd.Series, left: float, f: dict) -> tuple[pd.Series, float]:
-    """Frais minimums plus lourds que prévu : retire une action aux plus grosses lignes (au plus qty.sum() fois)."""
+def _round_down(qty: pd.Series, prices: pd.Series, left: float, f: dict[str, Any]) -> tuple[pd.Series, float]:
+    """Frais minimums plus lourds que prévu : retire une action aux plus grosses lignes (au plus qty.sum() fois).
+
+    Renvoie une copie des quantités et le budget restant ; `qty` n'est pas modifié.
+    """
+    qty = qty.copy()
     for _ in range(int(qty.sum())):
         if left >= 0:
             break
@@ -214,7 +240,7 @@ def _round_down(qty: pd.Series, prices: pd.Series, left: float, f: dict) -> tupl
     return qty, left
 
 
-def _quantities(target: pd.Series, prices: pd.Series, budget: float, f: dict) -> pd.Series:
+def _quantities(target: pd.Series, prices: pd.Series, budget: float, f: dict[str, Any]) -> pd.Series:
     """Quantités entières d'actions dont le coût total, frais compris, tient dans le budget."""
     est_fee = 1 + (f["courtage_pct"] * (1 + f["tva_courtage_pct"] / 100) + f["brvm_pct"] + f["dcbr_pct"] + f["amf_pct"]) / 100
     qty = np.floor(target / est_fee / prices).astype(int)
@@ -230,7 +256,8 @@ def _quantities(target: pd.Series, prices: pd.Series, budget: float, f: dict) ->
     return qty
 
 
-def _bond_row(weight: float, amount: float, unit: float) -> dict:
+def _bond_row(weight: float, amount: float, unit: float) -> dict[str, Any]:
+    """Ligne d'ordre de la poche obligataire."""
     rate = config.DEFAULT_OPTIM["bond_return"]
     return {
         "ticker": BOND,

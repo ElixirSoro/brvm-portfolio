@@ -37,6 +37,7 @@ def is_digit_group(token: str) -> bool:
 
 
 def _valid_number(groups: list[str]) -> bool:
+    """Vrai si les groupes de chiffres forment un nombre français valide (1 à 3 chiffres puis groupes de 3)."""
     if not groups or not 1 <= len(groups[0]) <= 3:
         return False
     return all(len(g) == 3 for g in groups[1:])
@@ -88,6 +89,7 @@ def amount_atoms(tokens: list[str]) -> list[tuple[str, str | None, bool]]:
 
 
 def _chunk_value(chunk: list[tuple[str, str | None, bool]]) -> float | None:
+    """Valeur d'un morceau de montant (signe, parenthèses, décimales) ; None s'il est illisible."""
     first = chunk[0][0]
     if not 1 <= len(first) <= 3 or any(len(a[0]) != 3 or a[2] for a in chunk[1:]):
         return None

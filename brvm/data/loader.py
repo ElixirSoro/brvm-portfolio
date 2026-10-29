@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pathlib import Path
 
 import pandas as pd
@@ -11,7 +13,10 @@ from .. import config, db, universe
 DIVIDENDS_CSV = config.ROOT / "data" / "dividendes.csv"
 
 
-def import_scrap_dir(scrap_dir: Path | None = None) -> dict:
+DIVIDEND_COLUMNS = ("ticker", "ex_date", "pay_date", "amount", "is_gross")
+
+
+def import_scrap_dir(scrap_dir: Path | None = None) -> dict[str, Any]:
     """Lit BRVM_historique_complet_toutes_entreprises.csv (ou les CSV par titre) et remplit la table prices."""
     scrap_dir = Path(scrap_dir or config.SCRAP_DIR)
     big = scrap_dir / "BRVM_historique_complet_toutes_entreprises.csv"
@@ -39,10 +44,17 @@ def import_scrap_dir(scrap_dir: Path | None = None) -> dict:
 
 
 def load_dividends(csv_path: Path | None = None) -> int:
+    """Charge le calendrier des dividendes (CSV) dans la base ; renvoie le nombre de lignes.
+
+    Renvoie 0 si le fichier est absent ; lève ValueError s'il manque des colonnes.
+    """
     path = Path(csv_path or DIVIDENDS_CSV)
     if not path.exists():
         return 0
     d = pd.read_csv(path)
-    rows = list(d[["ticker", "ex_date", "pay_date", "amount", "is_gross"]].itertuples(index=False, name=None))
+    missing = set(DIVIDEND_COLUMNS) - set(d.columns)
+    if missing:
+        raise ValueError(f"{path.name} : colonnes manquantes {sorted(missing)}")
+    rows = list(d[list(DIVIDEND_COLUMNS)].itertuples(index=False, name=None))
     db.executemany("INSERT OR REPLACE INTO dividends VALUES (?,?,?,?,?)", rows)
     return len(rows)

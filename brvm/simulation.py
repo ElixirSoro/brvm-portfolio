@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -23,6 +25,7 @@ class Plan:
 
 
 def _fee_rates(plan: Plan) -> tuple[float, float]:
+    """Taux de frais d'achat et de droits de garde annuels appliqués à la simulation."""
     f = fees_mod.current_fees()
     if plan.buy_fee_rate is None:
         order = max(plan.monthly * plan.group_months, 1)
@@ -55,6 +58,7 @@ class Returns:
 
 
 def _check(plan: Plan, model: Returns, n_paths: int) -> None:
+    """Lève ValueError si le plan, le modèle de rendement ou le nombre de trajectoires sont invalides."""
     if not 1 <= plan.years <= MAX_YEARS:
         raise ValueError(f"durée entre 1 et {MAX_YEARS} ans (reçu {plan.years})")
     if plan.initial < 0 or plan.monthly < 0 or plan.group_months < 1:
@@ -103,7 +107,7 @@ def _paths(plan: Plan, r: np.ndarray, buy: float, custody: float) -> tuple[np.nd
     return paths, invested
 
 
-def simulate(plan: Plan, model: Returns, n_paths: int = 5000, seed: int = 42) -> dict:
+def simulate(plan: Plan, model: Returns, n_paths: int = 5000, seed: int = 42) -> dict[str, Any]:
     """Simule n_paths trajectoires mensuelles du plan sous le modèle de rendement donné."""
     _check(plan, model, n_paths)
     months = plan.years * 12
@@ -135,7 +139,8 @@ def required_monthly(plan: Plan, model: Returns, confidence: float = 0.5, n_path
         raise ValueError(f"probabilité entre 0 et 1 exclus (reçu {confidence})")
 
     def reaches(monthly: float) -> bool:
-        return simulate(replace(plan, monthly=monthly), model, n_paths)["prob_goal"] >= confidence
+        """Vrai si ce versement mensuel atteint l'objectif avec la probabilité demandée."""
+        return bool(simulate(replace(plan, monthly=monthly), model, n_paths)["prob_goal"] >= confidence)
 
     lo, hi = 0.0, max(plan.goal / (plan.years * 12), MIN_MONTHLY_GUESS)
     for _ in range(SEARCH_GROW_STEPS):

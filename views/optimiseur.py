@@ -1,5 +1,10 @@
+"""Page Profil et optimiseur : questionnaire de risque, portefeuille optimal, ordres, frontière efficiente."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import sqlite3
 from datetime import date
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -106,8 +111,9 @@ params = {
 }
 
 
-@st.cache_data(ttl=600, show_spinner="Estimation des rendements et des risques…")
-def estimate(p: dict, with_signals: bool):
+@st.cache_data(ttl=600, show_spinner="Estimation des rendements et des risques…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+def estimate(p: dict[str, Any], with_signals: bool) -> optimizer.Inputs:
+    """Entrées de l'optimiseur, inclinées par les signaux de veille si demandé (mis en cache)."""
     sig = signals.ticker_signals()["signal"] if with_signals else None
     return optimizer.estimate(p, signals=sig)
 
@@ -195,8 +201,9 @@ with b2:
 ui.section("Comparer", "Frontière efficiente : plus de rendement contre plus de risque")
 
 
-@st.cache_data(ttl=600, show_spinner="Calcul de la frontière…")
-def front(p: dict, with_signals: bool):
+@st.cache_data(ttl=600, show_spinner="Calcul de la frontière…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+def front(p: dict[str, Any], with_signals: bool) -> pd.DataFrame:
+    """Frontière efficiente (mise en cache)."""
     return optimizer.frontier(estimate(p, with_signals), p)
 
 

@@ -11,6 +11,7 @@ HALF_LIFE_DAYS = {"court": 7, "moyen": 30, "long": 90}
 
 
 def impacts(days: int = 60) -> pd.DataFrame:
+    """Impacts d'actualité des `days` derniers jours, joints à leur article (titre, source, date, résumé)."""
     d = db.df(
         """SELECT i.*, n.title, n.url, n.source, n.published, n.summary, n.category, n.scope, n.method
                  FROM impacts i JOIN news n ON n.id = i.news_id
@@ -24,6 +25,7 @@ def impacts(days: int = 60) -> pd.DataFrame:
 
 
 def ticker_signals(days: int = 60) -> pd.DataFrame:
+    """Signal de veille par action : moyenne pondérée des scores (-2 à +2) sur `days` jours."""
     d = impacts(days)
     if d.empty:
         return pd.DataFrame(columns=["signal", "articles", "positives", "negatives"])

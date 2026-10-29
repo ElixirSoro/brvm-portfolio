@@ -10,7 +10,9 @@ Elle est à enrichir au fil du temps.
 
 from __future__ import annotations
 
-FACTORS: dict[str, dict] = {
+from typing import Any
+
+FACTORS: dict[str, dict[str, Any]] = {
     # --- matières premières (monde) ---
     "caoutchouc": {
         "label": "Prix du caoutchouc naturel",
@@ -154,7 +156,7 @@ FACTORS: dict[str, dict] = {
 }
 
 # action → aliases, facteurs {code: sens}
-EXPOSURES: dict[str, dict] = {
+EXPOSURES: dict[str, dict[str, Any]] = {
     "SNTS": {
         "aliases": ["Sonatel", "Orange Sénégal", "Orange Money Sénégal"],
         "factors": {"politique_sn": 1, "regulation_telecom": -1, "sahel_securite": 1, "fcfa_euro_dollar": 0},
@@ -230,12 +232,14 @@ for _t, (_aliases, _extra) in _BANKS.items():
 MARKET_WIDE = {"brvm_marche": 1, "fed_taux": -1, "dette_souveraine": 0}
 
 
-def exposures_for(ticker: str) -> dict:
+def exposures_for(ticker: str) -> dict[str, Any]:
+    """Alias et facteurs signés d'une action, facteurs de marché inclus (seulement ceux-ci si le ticker est inconnu)."""
     e = EXPOSURES.get(ticker, {"aliases": [], "factors": {}})
     return {"aliases": e["aliases"], "factors": {**MARKET_WIDE, **e["factors"]}}
 
 
 def tickers_for_factor(code: str) -> dict[str, int]:
+    """Actions exposées à un facteur, avec le sens de leur exposition (+1 ou -1)."""
     out = {}
     for t in EXPOSURES:
         f = exposures_for(t)["factors"]

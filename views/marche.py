@@ -1,4 +1,9 @@
+"""Page Marché : les 48 valeurs, historique d'une valeur et ses actualités."""
+
+# DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
+# la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import plotly.graph_objects as go
+import pandas as pd
 import streamlit as st
 
 from brvm import market, ui
@@ -9,8 +14,9 @@ if ui.no_data_warning():
     st.stop()
 
 
-@st.cache_data(ttl=300)
-def quotes():
+@st.cache_data(ttl=300)  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+def quotes() -> pd.DataFrame:
+    """Derniers cours (mis en cache)."""
     return market.latest_quotes()
 
 

@@ -12,6 +12,8 @@ Contrat
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import re
 from datetime import date
@@ -73,6 +75,7 @@ def parse_session_date(html_text: str) -> date:
 
 
 def _stock_table(soup: BeautifulSoup) -> Tag | None:
+    """Tableau des cours actions de la page brvm.org, ou None s'il est absent."""
     for table in soup.find_all("table"):
         first = table.find("th")
         if first is not None and first.get_text(strip=True) == EXPECTED_HEADER:
@@ -80,7 +83,8 @@ def _stock_table(soup: BeautifulSoup) -> Tag | None:
     raise BrvmParseError("tableau des cours introuvable (en-tête « Symbole » absent)")
 
 
-def _parse_rows(table: Tag) -> tuple[list[dict], int]:
+def _parse_rows(table: Tag) -> tuple[list[dict[str, Any]], int]:
+    """Lignes de cours valides du tableau brvm.org et nombre de lignes rejetées."""
     rows, skipped = [], 0
     body = table.find("tbody") or table
     for tr in body.find_all("tr"):
@@ -104,7 +108,8 @@ def _parse_rows(table: Tag) -> tuple[list[dict], int]:
     return rows, skipped
 
 
-def _parse_index(soup: BeautifulSoup) -> dict | None:
+def _parse_index(soup: BeautifulSoup) -> dict[str, Any] | None:
+    """Valeur et variation du BRVM Composite lues sur la page, ou None si absentes."""
     for td in soup.find_all("td"):
         if td.get_text(strip=True) == "BRVM-C":
             cells = [c.get_text(" ", strip=True) for c in td.find_parent("tr").find_all("td")]

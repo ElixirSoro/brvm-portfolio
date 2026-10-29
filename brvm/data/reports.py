@@ -10,6 +10,8 @@ Contrat
 
 from __future__ import annotations
 
+from typing import Any
+
 import hashlib
 import logging
 import re
@@ -53,13 +55,13 @@ def classify(title: str) -> tuple[str, str | None]:
     return kind, None
 
 
-def parse_report_list(html: str, ticker: str) -> list[dict]:
+def parse_report_list(html: str, ticker: str) -> list[dict[str, Any]]:
     """Rapports listés sur une page société de brvm.org."""
     if not isinstance(html, str):
         raise TypeError("HTML attendu")
     if ticker not in issuers.REPORT_SLUGS:
         raise ValueError(f"ticker inconnu : {ticker!r}")
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for tr in BeautifulSoup(html, "html.parser").find_all("tr"):
         a = tr.find("a", href=re.compile(r"\.pdf$", re.I))
         cell = tr.find("td")
@@ -73,12 +75,12 @@ def parse_report_list(html: str, ticker: str) -> list[dict]:
     return out
 
 
-def fetch_report_list(ticker: str, session: requests.Session | None = None) -> list[dict]:
+def fetch_report_list(ticker: str, session: requests.Session | None = None) -> list[dict[str, Any]]:
     """Tous les rapports d'une société (toutes ses adresses brvm.org, pages bornées)."""
     if ticker not in issuers.REPORT_SLUGS:
         raise ValueError(f"ticker inconnu : {ticker!r}")
     s = session or requests.Session()
-    seen: dict[str, dict] = {}
+    seen: dict[str, dict[str, Any]] = {}
     for slug in issuers.REPORT_SLUGS[ticker]:
         for page in range(MAX_LIST_PAGES):
             r = s.get(

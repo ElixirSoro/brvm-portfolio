@@ -11,9 +11,9 @@ Les quantités et cours antérieurs à un fractionnement sont convertis en actio
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import IO
+from typing import Any, IO
 
 import numpy as np
 import pandas as pd
@@ -37,10 +37,12 @@ def create(name: str, note: str = "") -> int:
 
 
 def list_all() -> pd.DataFrame:
+    """Portefeuilles virtuels enregistrés."""
     return db.df("SELECT * FROM portfolios ORDER BY id")
 
 
 def delete(pid: int) -> None:
+    """Supprime un portefeuille et toutes ses opérations."""
     db.execute("DELETE FROM transactions WHERE portfolio_id=?", (pid,))
     db.execute("DELETE FROM portfolios WHERE id=?", (pid,))
 
@@ -62,10 +64,11 @@ class Operation:
 
 
 def _dividend_tax(op: Operation, gross: float) -> float:
+    """IRVM retenu à la source sur un dividende saisi en brut (0 si saisi en net)."""
     if not (op.dividend_is_gross and op.ticker):
         return 0.0
     country = market.securities()["country"].get(op.ticker, "ci")
-    rate = db.get_setting("irvm", config.DEFAULT_IRVM).get(country, DEFAULT_IRVM_PCT) / 100
+    rate = float(db.get_setting("irvm", config.DEFAULT_IRVM).get(country, DEFAULT_IRVM_PCT)) / 100
     return gross * rate  # IRVM retenu à la source
 
 
@@ -109,10 +112,12 @@ def add(pid: int, op: Operation) -> int:
 
 
 def remove(tx_id: int) -> None:
+    """Supprime une opération."""
     db.execute("DELETE FROM transactions WHERE id=?", (tx_id,))
 
 
 def transactions(pid: int) -> pd.DataFrame:
+    """Opérations d'un portefeuille, avec quantités et cours convertis en actions actuelles (fractionnements)."""
     tx = db.df("SELECT * FROM transactions WHERE portfolio_id=? ORDER BY date, id", (pid,))
     if tx.empty:
         return tx
@@ -128,10 +133,11 @@ def transactions(pid: int) -> pd.DataFrame:
 
 
 def _opt_float(value: object) -> float | None:
+    """Nombre lu dans une cellule CSV ; None si la cellule est vide."""
     return None if str(value).strip() == "" else float(str(value))
 
 
-def import_csv(pid: int, csv_file: str | IO) -> int:
+def import_csv(pid: int, csv_file: str | IO[Any]) -> int:
     """CSV attendu : date,type,ticker,quantite,cours,montant,frais,note (colonnes vides permises)."""
     d = pd.read_csv(csv_file).fillna("")
     missing = {"date", "type"} - set(d.columns)
@@ -161,42 +167,50 @@ ACCOUNTS = ("cash", "deposits", "withdrawals", "fees", "dividends", "realized", 
 POSITION_COLUMNS = ["ticker", "quantity", "avg_cost", "cost", "realized"]
 
 
-def _book_line(book: dict[str, dict], t: pd.Series, acc: dict[str, float]) -> None:
-    """Applique une opération au livre des positions et aux comptes (mis à jour en place, variables locales)."""
-    k = t["type"]
-    acc["cash"] += CASH_SIGN[k] * t["net"]
-    if k in ("DEPOT", "RETRAIT", "FRAIS"):
-        acc[{"DEPOT": "deposits", "RETRAIT": "withdrawals", "FRAIS": "fees"}[k]] += t["net"]
-        return
-    if k in ("DIVIDENDE", "COUPON"):
-        acc["dividends"] += t["net"]
-        acc["irvm"] += t["fees"] or 0
-        return
-    acc["fees"] += t["fees"]
-    b = book.setdefault(t["ticker"], {"quantity": 0.0, "cost": 0.0, "realized": 0.0})
-    if k == "ACHAT":
-        b["quantity"] += t["adj_qty"]
-        b["cost"] += t["net"]
-        return
-    avg = b["cost"] / b["quantity"] if b["quantity"] else 0.0
-    sold_cost = avg * t["adj_qty"]
-    b["realized"] += t["net"] - sold_cost
-    acc["realized"] += t["net"] - sold_cost
-    b["quantity"] -= t["adj_qty"]
-    b["cost"] -= sold_cost
+@dataclass
+class _Ledger:
+    """Livre de comptes construit opération par opération (état propre, jamais partagé)."""
+
+    acc: dict[str, float] = field(default_factory=lambda: dict.fromkeys(ACCOUNTS, 0.0))
+    book: dict[str, dict[str, float]] = field(default_factory=dict)
+
+    def apply(self, t: pd.Series) -> None:
+        """Applique une opération (ligne de `transactions`) aux comptes et aux positions."""
+        k = t["type"]
+        if k not in CASH_SIGN:
+            raise ValueError(f"type d'opération inconnu en base : {k}")
+        self.acc["cash"] += CASH_SIGN[k] * t["net"]
+        if k in ("DEPOT", "RETRAIT", "FRAIS"):
+            self.acc[{"DEPOT": "deposits", "RETRAIT": "withdrawals", "FRAIS": "fees"}[k]] += t["net"]
+            return
+        if k in ("DIVIDENDE", "COUPON"):
+            self.acc["dividends"] += t["net"]
+            self.acc["irvm"] += t["fees"] or 0
+            return
+        self.acc["fees"] += t["fees"]
+        b = self.book.setdefault(t["ticker"], {"quantity": 0.0, "cost": 0.0, "realized": 0.0})
+        if k == "ACHAT":
+            b["quantity"] += t["adj_qty"]
+            b["cost"] += t["net"]
+            return
+        sold_cost = (b["cost"] / b["quantity"] if b["quantity"] else 0.0) * t["adj_qty"]
+        b["realized"] += t["net"] - sold_cost
+        self.acc["realized"] += t["net"] - sold_cost
+        b["quantity"] -= t["adj_qty"]
+        b["cost"] -= sold_cost
 
 
-def positions(pid: int, at: pd.Timestamp | None = None, tx: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict]:
+def positions(pid: int, at: pd.Timestamp | None = None, tx: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Positions détenues et comptes (liquidités, versements, frais, dividendes…) à la date `at`."""
     tx = transactions(pid) if tx is None else tx
-    acc = dict.fromkeys(ACCOUNTS, 0.0)
+    ledger = _Ledger()
     if tx.empty:
-        return pd.DataFrame(columns=POSITION_COLUMNS), acc
+        return pd.DataFrame(columns=POSITION_COLUMNS), ledger.acc
     if at is not None:
         tx = tx[tx["date"] <= at]
-    book: dict[str, dict] = {}
     for _, t in tx.iterrows():
-        _book_line(book, t, acc)
+        ledger.apply(t)
+    acc, book = ledger.acc, ledger.book
     rows = [
         {
             "ticker": tk,
@@ -213,13 +227,15 @@ def positions(pid: int, at: pd.Timestamp | None = None, tx: pd.DataFrame | None 
     return pos, acc
 
 
-def valuation(pid: int) -> tuple[pd.DataFrame, dict]:
+def valuation(pid: int) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Positions valorisées au dernier cours et synthèse (valeur, plus-value, frais de sortie, valeur liquidative)."""
     pos, acc = positions(pid)
     quotes = market.latest_quotes()
     secs = market.securities()
     if not pos.empty:
 
         def price_of(t: str) -> float:
+            """Cours de valorisation : dernier cours, ou prix de revient pour les obligations."""
             if t.startswith(BOND_PREFIX):
                 return float(pos.loc[pos["ticker"] == t, "avg_cost"].iloc[0])  # obligations au prix de revient
             return float(quotes["last"].get(t, np.nan)) if not quotes.empty else np.nan
@@ -263,6 +279,7 @@ def valuation(pid: int) -> tuple[pd.DataFrame, dict]:
 
 
 def custody_accrued(pid: int, value: float) -> float:
+    """Droits de garde courus depuis le dernier prélèvement saisi (ou depuis la première opération)."""
     tx = transactions(pid)
     if tx.empty:
         return 0.0

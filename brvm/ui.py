@@ -68,8 +68,10 @@ pio.templates["elixir"] = go.layout.Template(
 pio.templates.default = "elixir"
 
 
-@st.cache_resource
+# DÉROGATION règle 10 : st.cache_resource n'est pas annoté par Streamlit (mypy --strict le signale).
+@st.cache_resource  # type: ignore[untyped-decorator]
 def _init_db() -> bool:
+    """Initialise la base une seule fois par serveur et charge les dividendes si la table est vide."""
     db.init()
     from .data import loader
 
@@ -79,6 +81,7 @@ def _init_db() -> bool:
 
 
 def setup(label: str, title: str, intro: str | None = None) -> None:
+    """En-tête de page à la charte (surtitre, titre, introduction) et barre latérale."""
     _init_db()
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f'<p class="elx-label">{label}</p>', unsafe_allow_html=True)
@@ -88,6 +91,7 @@ def setup(label: str, title: str, intro: str | None = None) -> None:
 
 
 def section(label: str, title: str) -> None:
+    """Titre de section à la charte."""
     st.markdown(f'<p class="elx-label" style="margin-top:32px">{label}</p>', unsafe_allow_html=True)
     st.subheader(title)
 
@@ -101,14 +105,17 @@ def nb(x: float, dec: int = 0) -> str:
 
 
 def fcfa(x: float, dec: int = 0) -> str:
+    """Montant formaté en francs CFA ; « — » si la valeur manque."""
     return "—" if x is None or (isinstance(x, float) and np.isnan(x)) else f"{nb(x, dec)} F"
 
 
 def mfcfa(x: float) -> str:
+    """Montant en millions de francs CFA."""
     return f"{nb(x / 1e6, 2)} M F"
 
 
 def pct(x: float, dec: int = 1, signed: bool = False) -> str:
+    """Pourcentage au format français, signé si demandé."""
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "—"
     s = f"{x * 100:+.{dec}f}" if signed else f"{x * 100:.{dec}f}"
@@ -127,11 +134,13 @@ def metric_cards(items: list[tuple[str, str, bool]]) -> None:
 
 
 def colored(x: float, text: str | None = None) -> str:
+    """Texte HTML dont la classe dépend du signe de `x` (elx-pos, elx-neg ou neutre)."""
     cls = "elx-pos" if x > 0 else "elx-neg" if x < 0 else "elx-num"
     return f'<span class="{cls}">{text or pct(x, signed=True)}</span>'
 
 
 def sidebar() -> None:
+    """Barre latérale : nom du logiciel, fraîcheur des cours et de la veille."""
     with st.sidebar:
         st.markdown('<div class="elx-logo">BRVM Portfolio<span>.</span></div>', unsafe_allow_html=True)
         q = db.last_update("quotes") or db.last_update("prices")
@@ -145,6 +154,7 @@ def sidebar() -> None:
 
 
 def no_data_warning() -> bool:
+    """Affiche un message et renvoie True si la base ne contient aucun cours."""
     from . import market
 
     if market.has_data():
