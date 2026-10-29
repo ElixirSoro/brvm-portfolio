@@ -7,7 +7,13 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import streamlit as st
 
+from pathlib import Path
+
 from . import db
+
+VERSION = "0.2"
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+LOGO, LOGO_ICON = ASSETS / "logo-elixir.svg", ASSETS / "logo-elixir-icon.svg"
 
 INK, SURFACE, SURFACE_ALT, LINE = "#0D141F", "#18263A", "#131E2C", "#243447"
 PAPER, BODY, MUTED, ACCENT, AZUR = "#E8EDF3", "#C9D6E4", "#8CA0B8", "#F0B429", "#7AA6E2"
@@ -32,6 +38,9 @@ h1 {{ font-weight: 800 !important; }}
 .elx-neg {{ color: {BAD}; font-family: '{MONO}', monospace; }}
 .elx-logo {{ font-family: '{DISP}', sans-serif; font-weight: 800; font-size: 22px; color: {PAPER}; }}
 .elx-logo span {{ color: {ACCENT}; }}
+.elx-foot {{ margin-top: 72px; padding-top: 16px; border-top: 1px solid {LINE}; font-size: 14px; color: {MUTED}; }}
+.elx-foot .elx-logo {{ font-size: 16px; }}
+[data-testid="stLogo"] {{ height: 2.4rem; }}
 [data-testid="stMetricValue"], [data-testid="stDataFrame"] {{ font-family: '{MONO}', monospace; }}
 .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {{ border-radius: 999px; }}
 .elx-news {{ border-bottom: 1px solid {LINE}; padding: 10px 0; }}
@@ -152,7 +161,7 @@ def colored(x: float, text: str | None = None) -> str:
 def sidebar() -> None:
     """Barre latérale : nom du logiciel, fraîcheur des cours et de la veille."""
     with st.sidebar:
-        st.markdown('<div class="elx-logo">BRVM Portfolio<span>.</span></div>', unsafe_allow_html=True)
+        st.markdown('<p class="elx-label">BRVM Portfolio</p>', unsafe_allow_html=True)
         q = db.last_update("quotes") or db.last_update("prices")
         n = db.last_update("news")
         src = db.get_setting("quotes_source", "—")
@@ -161,6 +170,22 @@ def sidebar() -> None:
             f'Source : {src}<br>Veille : <span class="elx-num">{n or "jamais"}</span> (UTC)</p>',
             unsafe_allow_html=True,
         )
+
+
+def brand() -> None:
+    """Logotype « Elixir. » en haut de chaque page (barre latérale ouverte ou repliée) et signature en pied de page."""
+    if not LOGO.exists() or not LOGO_ICON.exists():
+        raise FileNotFoundError(f"logotype introuvable dans {LOGO.parent}")
+    st.logo(str(LOGO), size="large", icon_image=str(LOGO_ICON))
+
+
+def footer() -> None:
+    """Signature en pied de page, à la charte."""
+    st.markdown(
+        f'<div class="elx-foot">Conçu par <span class="elx-logo">Elixir<span>.</span></span>'
+        f' · <span class="elx-num">BRVM Portfolio v{VERSION}</span></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def no_data_warning() -> bool:

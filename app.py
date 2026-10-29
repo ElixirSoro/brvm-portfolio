@@ -19,6 +19,8 @@ pages = [
 ]
 nav = st.navigation(pages)
 
+ui.brand()
 ui._init_db()
 ui.sidebar()
 nav.run()
+ui.footer()
