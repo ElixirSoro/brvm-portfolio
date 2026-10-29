@@ -180,9 +180,9 @@ def brand() -> None:
 
 
 def footer() -> None:
-    """Signature en pied de page, à la charte."""
+    """Pied de page à la charte : logotype et version du logiciel."""
     st.markdown(
-        f'<div class="elx-foot">Conçu par <span class="elx-logo">Elixir<span>.</span></span>'
+        f'<div class="elx-foot"><span class="elx-logo">Elixir<span>.</span></span>'
         f' · <span class="elx-num">BRVM Portfolio v{VERSION}</span></div>',
         unsafe_allow_html=True,
     )
