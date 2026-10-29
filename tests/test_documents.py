@@ -286,3 +286,10 @@ def test_event_without_ticker_is_stored(tmp_path, monkeypatch):
     documents.store_boc(day, boc.parse_equities(pages), boc.parse_market(pages[0]), events, "https://www.brvm.org/x.pdf")
     got = db.df("SELECT ticker FROM events WHERE title='Avis du marché'")
     assert got["ticker"].tolist() == [""]
+
+
+def test_supabase_session_pooler_switches_to_transaction_mode(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://postgres.x:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres")
+    assert db.database_url().endswith(".pooler.supabase.com:6543/postgres")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:pw@localhost:5432/brvm")
+    assert db.database_url() == "postgresql://u:pw@localhost:5432/brvm"

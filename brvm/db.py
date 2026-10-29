@@ -35,8 +35,11 @@ from . import config, universe
 
 DB_ERRORS: tuple[type[Exception], ...] = (sqlite3.Error, psycopg.Error)
 SAVE_ERRORS: tuple[type[Exception], ...] = (ValueError, *DB_ERRORS)  # saisie refusée ou écriture impossible
-POOL_MAX = 6
+POOL_MAX = 4
 POOL_TIMEOUT_S = 30
+POOL_MAX_IDLE_S = 60  # une connexion inutilisée depuis 1 min est rendue au serveur
+SUPABASE_POOLER = "pooler.supabase.com"
+SESSION_PORT, TRANSACTION_PORT = ":5432/", ":6543/"
 CONNECT_TIMEOUT_S = 10
 SQLITE_TIMEOUT_S = 30
 
@@ -183,8 +186,15 @@ def redact(text: str) -> str:
 
 
 def database_url() -> str:
-    """Chaîne de connexion PostgreSQL (variable DATABASE_URL), vide en mode local SQLite."""
-    return os.getenv("DATABASE_URL", "").strip()
+    """Chaîne de connexion PostgreSQL (variable DATABASE_URL), vide en mode local SQLite.
+
+    Le pooler Supabase en mode session (port 5432) réserve une connexion serveur par client et plafonne vite
+    (15 sur la plus petite offre) ; on passe sur le mode transaction (port 6543), qui les partage.
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    if SUPABASE_POOLER in url and SESSION_PORT in url:
+        url = url.replace(SESSION_PORT, TRANSACTION_PORT, 1)
+    return url
 
 
 @functools.lru_cache(maxsize=1)
@@ -198,7 +208,7 @@ def _pool(url: str) -> ConnectionPool[Any]:
         probe.execute("SELECT 1")
     # prepare_threshold=None : compatible avec le pooler de Supabase (mode transaction)
     pool: ConnectionPool[Any] = ConnectionPool(
-        url, min_size=1, max_size=POOL_MAX, timeout=POOL_TIMEOUT_S, open=True,
+        url, min_size=0, max_size=POOL_MAX, max_idle=POOL_MAX_IDLE_S, timeout=POOL_TIMEOUT_S, open=True,
         kwargs={"prepare_threshold": None, "row_factory": dict_row},
     )  # fmt: skip
     atexit.register(pool.close)
