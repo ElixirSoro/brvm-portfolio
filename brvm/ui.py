@@ -14,7 +14,7 @@ from . import db
 APP_NAME = "Mr investor"
 VERSION = "0.2"
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
-LOGO, LOGO_ICON = ASSETS / "logo-elixir.svg", ASSETS / "logo-elixir-icon.svg"
+LOGO, LOGO_ICON = ASSETS / "logo-elixir.svg", ASSETS / "logo-mr-investor.svg"
 
 INK, SURFACE, SURFACE_ALT, LINE = "#0D141F", "#18263A", "#131E2C", "#243447"
 PAPER, BODY, MUTED, ACCENT, AZUR = "#E8EDF3", "#C9D6E4", "#8CA0B8", "#F0B429", "#7AA6E2"
@@ -174,7 +174,7 @@ def sidebar() -> None:
 
 
 def brand() -> None:
-    """Logotype « Elixir. » en haut de chaque page (barre latérale ouverte ou repliée) et signature en pied de page."""
+    """En haut de chaque page : logotype « Elixir. » barre latérale ouverte, « Mr investor. » barre repliée."""
     if not LOGO.exists() or not LOGO_ICON.exists():
         raise FileNotFoundError(f"logotype introuvable dans {LOGO.parent}")
     st.logo(str(LOGO), size="large", icon_image=str(LOGO_ICON))
