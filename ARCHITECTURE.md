@@ -1,6 +1,6 @@
 # BRVM Portfolio — cadrage
 
-Version 0.1 · 29 octobre 2026 · Elixir
+Version 0.2 · 29 octobre 2026 · Elixir
 
 Un logiciel local qui répond à quatre questions : **quel portefeuille BRVM pour mon niveau de risque**, **où peut-il m'amener**, **où en est mon vrai portefeuille, frais compris**, et **qu'est-ce qui, dans le monde, peut faire bouger mes actions**.
 
@@ -13,7 +13,8 @@ Un logiciel local qui répond à quatre questions : **quel portefeuille BRVM pou
 | Simulations | Monte-Carlo (bootstrap des rendements historiques ou loi normale), versements mensuels, dividendes réinvestis, frais, probabilité d'atteindre l'objectif | `brvm/simulation.py` |
 | Portefeuille virtuel | Copie du portefeuille réel : achats, ventes, dépôts, dividendes nets d'IRVM, frais SGI/BRVM/DC-BR/TVA, droits de garde ; valorisation au cours du jour ; performance vs BRVM Composite | `brvm/portfolio.py`, `brvm/fees.py` |
 | Veille (bots) | Collecte d'actualités et d'indicateurs (CI, Afrique, monde), analyse par IA, score d'impact par action | `brvm/bots/` |
-| Interface | Application Streamlit dans le navigateur | `app.py`, `pages/` |
+| Documents officiels | Lecture des BOC (cours officiels, PER, rendement, indices, communiqués, AG) et des états financiers des sociétés cotées ; extraction des grands postes par règles ou par IA | `brvm/data/boc.py`, `brvm/data/reports.py`, `brvm/analysis/financials.py`, `brvm/documents.py` |
+| Interface | Application Streamlit dans le navigateur | `app.py`, `views/` |
 
 Stockage : une base SQLite (`data/brvm.db`) — rien ne sort de ton ordinateur, sauf les textes envoyés à l'API Claude pour l'analyse.
 
@@ -24,6 +25,8 @@ Stockage : une base SQLite (`data/brvm.db`) — rien ne sort de ton ordinateur, 
 | Cours du jour et historique | API Sika Finance `GetHistos` (celle de ton scraper `Cote_scrapper`) ; historique déjà ajusté du fractionnement Sonatel | toutes les 5 min en séance | Pas d'API officielle BRVM : Sika peut changer son API ou appliquer un délai |
 | Cours de secours | Page officielle brvm.org/fr/cours-actions/0 : clôture, variation, volume, indice | si Sika renvoie moins de 40 séries sur 50 | Une seule séance (pas d'historique) ; les colonnes « veille » et « ouverture » de la page ne sont pas utilisées, elles ne concordent pas toujours avec la variation |
 | Historique 10 ans | Import des CSV de `BRVM_DATA_SCRAP`, ou téléchargement intégré | au premier lancement | Historique non ajusté des splits : la table `corporate_actions` corrige |
+| Bulletin Officiel de la Cote | PDF quotidien de brvm.org/fr/bulletins-officiels-de-la-cote | chaque soir (bots) | PDF texte ; nombres sans séparateur fiable, contrôlés par recoupement |
+| États financiers | brvm.org/fr/rapports-societe-cotes/<société> | chaque jour (bots) | Formats très variables, PDF parfois scannés (IA indispensable) |
 | Dividendes | Calendrier BOC saisi dans `data/dividendes.csv` | chaque saison | À compléter chaque année (avril–septembre) |
 | Facteurs exogènes chiffrés | Yahoo Finance via `yfinance` : Brent, cacao, sucre, or, EUR/USD, taux US 10 ans | quotidienne | Pas de cotation libre pour le caoutchouc et l'huile de palme : couverts par la veille texte |
 | Actualités | Flux RSS (Sika Finance, Richbourse, Agence Ecofin, AllAfrica, BCEAO, Reuters Africa, etc.) | toutes les heures | Certains sites n'ont pas de RSS : extraction HTML, plus fragile |
@@ -73,6 +76,7 @@ Sans clé API, les bots continuent de collecter et appliquent un score par mots-
 | Version | Contenu |
 | --- | --- |
 | 0.1 (ce prototype) | Les 5 modules fonctionnels, données Sika, SQLite, bots RSS + IA, interface Streamlit |
-| 0.2 | Lecture automatique des PDF du BOC (dividendes, AGO), alertes e-mail/WhatsApp sur signal fort |
+| 0.2 (fait) | Lecture automatique des BOC et des états financiers ; mise en conformité « code fiable » |
+| 0.2.1 | Alertes e-mail/WhatsApp sur signal fort |
 | 0.3 | Obligations cotées dans l'optimiseur, Black-Litterman avec les signaux des bots comme « vues » |
 | 0.4 | Backtest des stratégies (rééquilibrage annuel vs achat-conservation), export PDF du suivi |

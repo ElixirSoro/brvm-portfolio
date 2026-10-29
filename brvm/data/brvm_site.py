@@ -9,6 +9,7 @@ Contrat
 - On ne se fie qu'à la clôture, à la variation et au volume : sur la page, les colonnes « veille » et
   « ouverture » ne concordent pas toujours avec la variation affichée.
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,17 +18,31 @@ from datetime import date
 
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 URL = "https://www.brvm.org/fr/cours-actions/0"
-USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 TIMEOUT_S = 30
 EXPECTED_HEADER = "Symbole"
-MIN_ROWS = 30            # en dessous, la page est jugée incomplète
-COLS_STOCK_ROW = 7       # symbole, nom, volume, veille, ouverture, clôture, variation
-MONTHS_FR = {"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7,
-             "août": 8, "aout": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12}
+MIN_ROWS = 30  # en dessous, la page est jugée incomplète
+COLS_STOCK_ROW = 7  # symbole, nom, volume, veille, ouverture, clôture, variation
+MONTHS_FR = {
+    "janvier": 1,
+    "février": 2,
+    "fevrier": 2,
+    "mars": 3,
+    "avril": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7,
+    "août": 8,
+    "aout": 8,
+    "septembre": 9,
+    "octobre": 10,
+    "novembre": 11,
+    "décembre": 12,
+    "decembre": 12,
+}
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +72,7 @@ def parse_session_date(html_text: str) -> date:
     return date(year, MONTHS_FR[month_name], day)
 
 
-def _stock_table(soup: BeautifulSoup):
+def _stock_table(soup: BeautifulSoup) -> Tag | None:
     for table in soup.find_all("table"):
         first = table.find("th")
         if first is not None and first.get_text(strip=True) == EXPECTED_HEADER:
@@ -65,7 +80,7 @@ def _stock_table(soup: BeautifulSoup):
     raise BrvmParseError("tableau des cours introuvable (en-tête « Symbole » absent)")
 
 
-def _parse_rows(table) -> tuple[list[dict], int]:
+def _parse_rows(table: Tag) -> tuple[list[dict], int]:
     rows, skipped = [], 0
     body = table.find("tbody") or table
     for tr in body.find_all("tr"):
@@ -74,8 +89,15 @@ def _parse_rows(table) -> tuple[list[dict], int]:
             skipped += 1
             continue
         try:
-            rows.append({"ticker": cells[0].upper(), "volume": to_number(cells[2]), "open": to_number(cells[4]),
-                         "close": to_number(cells[5]), "change": to_number(cells[6]) / 100})
+            rows.append(
+                {
+                    "ticker": cells[0].upper(),
+                    "volume": to_number(cells[2]),
+                    "open": to_number(cells[4]),
+                    "close": to_number(cells[5]),
+                    "change": to_number(cells[6]) / 100,
+                }
+            )
         except ValueError as e:
             log.warning("ligne BRVM ignorée (%s) : %s", e, cells[:2])
             skipped += 1
@@ -87,8 +109,13 @@ def _parse_index(soup: BeautifulSoup) -> dict | None:
         if td.get_text(strip=True) == "BRVM-C":
             cells = [c.get_text(" ", strip=True) for c in td.find_parent("tr").find_all("td")]
             if len(cells) >= 3:
-                return {"ticker": "BRVMC", "volume": None, "open": None, "close": to_number(cells[1]),
-                        "change": to_number(cells[2]) / 100}
+                return {
+                    "ticker": "BRVMC",
+                    "volume": None,
+                    "open": None,
+                    "close": to_number(cells[1]),
+                    "change": to_number(cells[2]) / 100,
+                }
     return None
 
 

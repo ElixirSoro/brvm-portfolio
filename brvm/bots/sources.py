@@ -4,6 +4,7 @@
 2. Flux RSS directs : à compléter dans data/sources_rss.txt (une URL par ligne, # pour commenter).
 3. Indicateurs chiffrés : Yahoo Finance (yfinance), si installé.
 """
+
 from __future__ import annotations
 
 from urllib.parse import quote_plus
@@ -16,12 +17,12 @@ GN_EN = "https://news.google.com/rss/search?q={q}+when:7d&hl=en-US&gl=US&ceid=US
 
 # Indicateurs chiffrés suivis (code facteur → ticker Yahoo Finance)
 MARKET_FACTORS = {
-    "petrole": "BZ=F",          # Brent
+    "petrole": "BZ=F",  # Brent
     "cacao": "CC=F",
     "sucre": "SB=F",
     "or": "GC=F",
     "fcfa_euro_dollar": "EURUSD=X",
-    "fed_taux": "^TNX",         # taux US 10 ans
+    "fed_taux": "^TNX",  # taux US 10 ans
     "cafe": "KC=F",
     "coton": "CT=F",
 }
@@ -42,13 +43,27 @@ def google_news_feeds() -> list[dict]:
     for code, f in FACTORS.items():
         for q in f["queries"]:
             tpl = GN_EN if _is_english(q) else GN_FR
-            feeds.append({"url": tpl.format(q=quote_plus(q)), "query": q, "theme": code, "scope": f["scope"],
-                          "source": "Google Actualités"})
+            feeds.append(
+                {
+                    "url": tpl.format(q=quote_plus(q)),
+                    "query": q,
+                    "theme": code,
+                    "scope": f["scope"],
+                    "source": "Google Actualités",
+                }
+            )
     for t, e in EXPOSURES.items():
         name = e["aliases"][0]
         q = f'"{name}"' if " " in name else name
-        feeds.append({"url": GN_FR.format(q=quote_plus(q + " BRVM OR bourse OR résultats OR dividende")),
-                      "query": name, "theme": f"societe:{t}", "scope": "Société", "source": "Google Actualités"})
+        feeds.append(
+            {
+                "url": GN_FR.format(q=quote_plus(q + " BRVM OR bourse OR résultats OR dividende")),
+                "query": name,
+                "theme": f"societe:{t}",
+                "scope": "Société",
+                "source": "Google Actualités",
+            }
+        )
     return feeds
 
 
@@ -56,10 +71,10 @@ def extra_feeds() -> list[dict]:
     if not RSS_FILE.exists():
         RSS_FILE.write_text(DEFAULT_RSS, encoding="utf-8")
     out = []
-    for line in RSS_FILE.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            out.append({"url": line, "query": "", "theme": "general", "scope": "", "source": line.split("/")[2]})
+    for raw in RSS_FILE.read_text(encoding="utf-8").splitlines():
+        url = raw.strip()
+        if url and not url.startswith("#"):
+            out.append({"url": url, "query": "", "theme": "general", "scope": "", "source": url.split("/")[2]})
     return out
 
 

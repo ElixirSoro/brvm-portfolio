@@ -4,9 +4,12 @@ import streamlit as st
 
 from brvm import market, optimizer, portfolio, simulation, ui
 
-ui.setup("Simulations", "Où ce plan peut-il t'amener ?",
-         "Des milliers de trajectoires possibles du marché, avec tes versements, les dividendes réinvestis et les frais. "
-         "Le résultat n'est pas une promesse : c'est une fourchette.")
+ui.setup(
+    "Simulations",
+    "Où ce plan peut-il t'amener ?",
+    "Des milliers de trajectoires possibles du marché, avec tes versements, les dividendes réinvestis et les frais. "
+    "Le résultat n'est pas une promesse : c'est une fourchette.",
+)
 
 opt = st.session_state.get("optim")
 
@@ -18,8 +21,13 @@ years = c3.slider("Durée", 1, 30, 10, format="%d ans")
 goal = c4.number_input("Objectif (F)", 0, 10_000_000_000, 5_000_000, 250_000)
 d1, d2, d3 = st.columns(3)
 growth = d1.slider("Hausse annuelle des versements", 0, 10, 0, format="%d %%") / 100
-group = d2.select_slider("Un ordre d'achat tous les", [1, 2, 3, 6, 12], 3, format_func=lambda m: f"{m} mois",
-                         help="Regrouper les versements limite le poids du courtage minimum.")
+group = d2.select_slider(
+    "Un ordre d'achat tous les",
+    [1, 2, 3, 6, 12],
+    3,
+    format_func=lambda m: f"{m} mois",
+    help="Regrouper les versements limite le poids du courtage minimum.",
+)
 paths = d3.select_slider("Nombre de trajectoires", [1000, 2000, 5000, 10000], 5000)
 
 ui.section("Le placement", "Rendement et risque")
@@ -60,55 +68,73 @@ elif src == sources[2]:
     w[optimizer.BOND] = 1 - w.sum()
     st_ = optimizer.stats(w, inp)
     mu, sigma = st_["expected_return"], st_["volatility"]
-    st.markdown(f"Valeur actuelle {ui.fcfa(initial)} (utilisée comme capital de départ) · rendement espéré "
-                f"{ui.pct(mu)} · volatilité {ui.pct(sigma)}.")
+    st.markdown(
+        f"Valeur actuelle {ui.fcfa(initial)} (utilisée comme capital de départ) · rendement espéré "
+        f"{ui.pct(mu)} · volatilité {ui.pct(sigma)}."
+    )
 else:
     e1, e2 = st.columns(2)
     mu = e1.number_input("Rendement annuel moyen (%)", -10.0, 40.0, 8.5, 0.5) / 100
     sigma = e2.number_input("Volatilité annuelle (%)", 0.0, 80.0, 13.0, 0.5) / 100
 
-plan = simulation.Plan(initial=initial, monthly=monthly, years=years, goal=goal,
-                       contribution_growth=growth, group_months=group)
-res = simulation.simulate(plan, mu, sigma, monthly_returns=monthly_hist, n_paths=paths, method=method)
+plan = simulation.Plan(initial=initial, monthly=monthly, years=years, goal=goal, contribution_growth=growth, group_months=group)
+model = simulation.Returns(mu, sigma, monthly_hist, method)
+res = simulation.simulate(plan, model, n_paths=paths)
 
 ui.section("Résultat", "La fourchette des possibles")
-ui.metric_cards([
-    (ui.mfcfa(res["final_median"]), "valeur médiane à l'échéance (1 chance sur 2 de faire mieux)", True),
-    (f"{ui.mfcfa(res['final_p5'])} – {ui.mfcfa(res['final_p95'])}", "fourchette à 90 %", False),
-    (ui.pct(res["prob_goal"], 0), f"probabilité d'atteindre {ui.mfcfa(goal)}", False),
-    (ui.mfcfa(res["invested"]), "total versé", False),
-])
+ui.metric_cards(
+    [
+        (ui.mfcfa(res["final_median"]), "valeur médiane à l'échéance (1 chance sur 2 de faire mieux)", True),
+        (f"{ui.mfcfa(res['final_p5'])} – {ui.mfcfa(res['final_p95'])}", "fourchette à 90 %", False),
+        (ui.pct(res["prob_goal"], 0), f"probabilité d'atteindre {ui.mfcfa(goal)}", False),
+        (ui.mfcfa(res["invested"]), "total versé", False),
+    ]
+)
 
 fan = res["fan"]
 x = fan.index / 12
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=x, y=fan["p95"], line=dict(width=0), showlegend=False, hoverinfo="skip"))
-fig.add_trace(go.Scatter(x=x, y=fan["p5"], fill="tonexty", fillcolor="rgba(122,166,226,.12)", line=dict(width=0),
-                         name="90 % des cas"))
-fig.add_trace(go.Scatter(x=x, y=fan["p75"], line=dict(width=0), showlegend=False, hoverinfo="skip"))
-fig.add_trace(go.Scatter(x=x, y=fan["p25"], fill="tonexty", fillcolor="rgba(122,166,226,.25)", line=dict(width=0),
-                         name="50 % des cas"))
-fig.add_trace(go.Scatter(x=x, y=fan["p50"], name="Médiane", line=dict(color=ui.AZUR, width=2.6)))
-fig.add_trace(go.Scatter(x=x, y=fan["invested"], name="Argent versé", line=dict(color=ui.MUTED, width=1.5, dash="dot")))
-fig.add_hline(y=goal, line=dict(color=ui.ACCENT, width=1.5, dash="dash"),
-              annotation_text=f"Objectif {ui.mfcfa(goal)}", annotation_font=dict(color=ui.ACCENT, family=ui.MONO))
-fig.update_layout(height=460, xaxis_title="Années", yaxis_title="FCFA", legend=dict(orientation="h", y=-0.18),
-                  hovermode="x unified")
-st.plotly_chart(fig, use_container_width=True)
+fig.add_trace(go.Scatter(x=x, y=fan["p95"], line={"width": 0}, showlegend=False, hoverinfo="skip"))
+fig.add_trace(
+    go.Scatter(x=x, y=fan["p5"], fill="tonexty", fillcolor="rgba(122,166,226,.12)", line={"width": 0}, name="90 % des cas")
+)
+fig.add_trace(go.Scatter(x=x, y=fan["p75"], line={"width": 0}, showlegend=False, hoverinfo="skip"))
+fig.add_trace(
+    go.Scatter(x=x, y=fan["p25"], fill="tonexty", fillcolor="rgba(122,166,226,.25)", line={"width": 0}, name="50 % des cas")
+)
+fig.add_trace(go.Scatter(x=x, y=fan["p50"], name="Médiane", line={"color": ui.AZUR, "width": 2.6}))
+fig.add_trace(go.Scatter(x=x, y=fan["invested"], name="Argent versé", line={"color": ui.MUTED, "width": 1.5, "dash": "dot"}))
+fig.add_hline(
+    y=goal,
+    line={"color": ui.ACCENT, "width": 1.5, "dash": "dash"},
+    annotation_text=f"Objectif {ui.mfcfa(goal)}",
+    annotation_font={"color": ui.ACCENT, "family": ui.MONO},
+)
+fig.update_layout(
+    height=460, xaxis_title="Années", yaxis_title="FCFA", legend={"orientation": "h", "y": -0.18}, hovermode="x unified"
+)
+st.plotly_chart(fig, width="stretch")
 
 a, b, c = st.columns(3)
-a.markdown(f"Frais d'achat appliqués : <span class='elx-num'>{ui.pct(res['buy_fee_rate'], 2)}</span> de chaque versement",
-           unsafe_allow_html=True)
+a.markdown(
+    f"Frais d'achat appliqués : <span class='elx-num'>{ui.pct(res['buy_fee_rate'], 2)}</span> de chaque versement",
+    unsafe_allow_html=True,
+)
 b.markdown(f"Droits de garde : <span class='elx-num'>{ui.pct(res['custody_rate'], 2)}</span> par an", unsafe_allow_html=True)
-c.markdown(f"Pire baisse en cours de route (médiane) : <span class='elx-num'>{ui.pct(res['median_max_drawdown'], 0)}</span>",
-           unsafe_allow_html=True)
+c.markdown(
+    f"Pire baisse en cours de route (médiane) : <span class='elx-num'>{ui.pct(res['median_max_drawdown'], 0)}</span>",
+    unsafe_allow_html=True,
+)
 
 ui.section("Combien verser ?", "Le versement mensuel nécessaire")
-conf = st.select_slider("Probabilité d'atteindre l'objectif souhaitée", [0.5, 0.6, 0.7, 0.8, 0.9], 0.7,
-                        format_func=lambda v: f"{v:.0%}")
+conf = st.select_slider(
+    "Probabilité d'atteindre l'objectif souhaitée", [0.5, 0.6, 0.7, 0.8, 0.9], 0.7, format_func=lambda v: f"{v:.0%}"
+)
 if st.button("Calculer le versement nécessaire", icon=":material/calculate:"):
     with st.spinner("Recherche du versement…"):
-        need = simulation.required_monthly(plan, mu, sigma, conf)
-    st.markdown(f"Pour atteindre **{ui.mfcfa(goal)}** en {years} ans avec {ui.pct(conf, 0)} de chances, il faut verser environ "
-                f"<span class='elx-metric' style='font-size:22px'>{ui.fcfa(np.ceil(need / 500) * 500)}</span> par mois.",
-                unsafe_allow_html=True)
+        need = simulation.required_monthly(plan, simulation.Returns(mu, sigma), conf)
+    st.markdown(
+        f"Pour atteindre **{ui.mfcfa(goal)}** en {years} ans avec {ui.pct(conf, 0)} de chances, il faut verser environ "
+        f"<span class='elx-metric' style='font-size:22px'>{ui.fcfa(np.ceil(need / 500) * 500)}</span> par mois.",
+        unsafe_allow_html=True,
+    )

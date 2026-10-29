@@ -1,4 +1,5 @@
 """Import de l'historique déjà téléchargé par Cote_scrapper (BRVM_DATA_SCRAP) et du calendrier des dividendes."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,8 +18,9 @@ def import_scrap_dir(scrap_dir: Path | None = None) -> dict:
     if big.exists():
         frames = [pd.read_csv(big)]
     else:
-        frames = [pd.read_csv(p).assign(Ticker=p.name.split("_historique")[0])
-                  for p in scrap_dir.glob("*/*_historique_cotations.csv")]
+        frames = [
+            pd.read_csv(p).assign(Ticker=p.name.split("_historique")[0]) for p in scrap_dir.glob("*/*_historique_cotations.csv")
+        ]
     if not frames:
         return {"rows": 0, "tickers": 0, "message": f"Aucun CSV trouvé dans {scrap_dir}"}
     raw = pd.concat(frames, ignore_index=True)
@@ -26,8 +28,11 @@ def import_scrap_dir(scrap_dir: Path | None = None) -> dict:
     raw["date"] = pd.to_datetime(raw["Date"]).dt.date.astype(str)
     known = set(universe.by_ticker())
     raw = raw[raw["ticker"].isin(known)]
-    rows = list(raw[["ticker", "date", "Ouverture", "Plus_haut", "Plus_bas", "Cloture", "Volume_titres"]]
-                .itertuples(index=False, name=None))
+    rows = list(
+        raw[["ticker", "date", "Ouverture", "Plus_haut", "Plus_bas", "Cloture", "Volume_titres"]].itertuples(
+            index=False, name=None
+        )
+    )
     db.executemany("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?,?,?)", rows)
     db.mark_update("prices")
     return {"rows": len(rows), "tickers": raw["ticker"].nunique(), "message": "ok"}

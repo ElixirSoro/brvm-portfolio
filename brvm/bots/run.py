@@ -1,79 +1,139 @@
 """Lancement des bots en ligne de commande.
 
-  python -m brvm.bots.run              un passage complet : cours, actualités, analyse, indicateurs
-  python -m brvm.bots.run --loop       tourne en continu : cours toutes les 5 min en séance,
-                                       actualités toutes les heures, indicateurs une fois par jour
+  python -m brvm.bots.run                 un passage : cours, actualités, analyse, indicateurs, BOC du jour
+  python -m brvm.bots.run --loop          en continu pendant --hours heures (168 par défaut) :
+                                          cours toutes les 5 min en séance, actualités toutes les heures,
+                                          BOC du jour après la séance, rapports des sociétés une fois par jour
+
+Contrat : la boucle est bornée par la durée (--hours) ; chaque cycle capture ses propres erreurs attendues
+(réseau, base, lecture de document) et les journalise sans arrêter les autres cycles.
 """
+
 from __future__ import annotations
 
 import argparse
+import logging
+import sqlite3
 import time
+from collections.abc import Callable
 from datetime import datetime
 
-from .. import config, db
-from ..data import quotes
+import requests
+
+from .. import config, db, documents, universe
+from ..analysis import financials
+from ..data import boc, quotes
 from . import analyst, collector
 
+TICK_S = 30
+MAX_HOURS = 24 * 31
+BOC_AFTER_HOUR = 17  # le BOC est publié en fin d'après-midi (heure d'Abidjan = GMT)
+DAY_S = 24 * 3600
+EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
+    requests.RequestException,
+    sqlite3.Error,
+    ValueError,
+    OSError,
+    quotes.QuotesUnavailable,
+    boc.BocParseError,
+    financials.ExtractionError,
+)
 
-def log(msg: str) -> None:
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+log = logging.getLogger("brvm.bots")
 
 
 def in_session(now: datetime) -> bool:
+    """Vrai pendant la séance de la BRVM (jours ouvrés, 9h-16h GMT)."""
     return now.weekday() < 5 and config.SESSION_OPEN_HOUR <= now.hour < config.SESSION_CLOSE_HOUR + 1
 
 
 def news_cycle() -> None:
     r = collector.collect()
-    log(f"Veille : {r['new']} nouveaux articles sur {r['feeds']} flux ({len(r['errors'])} erreurs)")
+    log.info("Veille : %s nouveaux articles sur %s flux (%s erreurs)", r["new"], r["feeds"], len(r["errors"]))
     a = analyst.analyze_pending()
-    mode = "IA" if a["ai_enabled"] else "mots-clés"
-    log(f"Analyse ({mode}) : {a['analyzed']} articles" + (f", erreurs : {a['errors'][:2]}" if a["errors"] else ""))
+    log.info("Analyse (%s) : %s articles", "IA" if a["ai_enabled"] else "mots-clés", a["analyzed"])
+    for e in a["errors"][:2]:
+        log.warning("IA : %s", e)
 
 
 def quotes_cycle() -> None:
-    try:
-        r = quotes.refresh()
-        log(f"Cours : {r['ok']} valeurs à jour · source {r['source']}")
-    except quotes.QuotesUnavailable as e:
-        log(f"Cours indisponibles : {e}")
+    r = quotes.refresh()
+    log.info("Cours : %s valeurs à jour · source %s", r["ok"], r["source"])
 
 
 def factors_cycle() -> None:
     r = collector.collect_market_factors(period="1mo")
-    log(f"Indicateurs : {r['ok']} séries ({len(r['errors'])} erreurs)")
+    log.info("Indicateurs : %s séries (%s erreurs)", r["ok"], len(r["errors"]))
+
+
+def boc_cycle() -> None:
+    r = documents.import_latest_bocs(2)
+    log.info("BOC : %s importé(s)", len(r["imported"]))
+    for e in r["errors"]:
+        log.warning(e)
+
+
+def reports_cycle() -> None:
+    r = documents.refresh_reports([t for t, *_ in universe.SECURITIES])
+    log.info("Rapports des sociétés : %s nouveaux (%s erreurs)", r["new"], len(r["errors"]))
+
+
+def run_safely(name: str, cycle: Callable[[], None]) -> bool:
+    """Exécute un cycle ; une erreur attendue est journalisée et n'arrête pas les bots."""
+    try:
+        cycle()
+        return True
+    except EXPECTED_ERRORS as e:
+        log.error("%s en échec : %s", name, e)
+        return False
+
+
+def due(now: float, last: float, period_s: float) -> bool:
+    return now - last >= period_s
+
+
+def loop(hours: float, with_quotes: bool) -> None:
+    """Boucle bornée : s'arrête après `hours` heures."""
+    if not 0 < hours <= MAX_HOURS:
+        raise ValueError(f"durée entre 0 et {MAX_HOURS} heures (reçu {hours})")
+    last = {"news": 0.0, "quotes": 0.0, "factors": 0.0, "boc": 0.0, "reports": 0.0}
+    max_ticks = int(hours * 3600 / TICK_S) + 1
+    log.info("Bots démarrés pour %s h (Ctrl+C pour arrêter)", hours)
+    for _ in range(max_ticks):
+        now, t = datetime.now(), time.time()
+        if with_quotes and in_session(now) and due(t, last["quotes"], config.QUOTE_REFRESH_MINUTES * 60):
+            run_safely("Cours", quotes_cycle)
+            last["quotes"] = t
+        if due(t, last["news"], config.NEWS_REFRESH_MINUTES * 60):
+            run_safely("Veille", news_cycle)
+            last["news"] = t
+        if now.hour >= BOC_AFTER_HOUR and due(t, last["boc"], DAY_S / 2):
+            run_safely("BOC", boc_cycle)
+            last["boc"] = t
+        for name, cycle in (("factors", factors_cycle), ("reports", reports_cycle)):
+            if due(t, last[name], DAY_S):
+                run_safely(name, cycle)
+                last[name] = t
+        time.sleep(TICK_S)
+    log.info("Durée atteinte : arrêt des bots")
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Bots BRVM Portfolio")
-    p.add_argument("--loop", action="store_true")
-    p.add_argument("--no-quotes", action="store_true")
+    p.add_argument("--loop", action="store_true", help="tourner en continu")
+    p.add_argument("--hours", type=float, default=168.0, help="durée maximale de la boucle (heures)")
+    p.add_argument("--no-quotes", action="store_true", help="ne pas rafraîchir les cours")
     args = p.parse_args()
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
     db.init()
-    if not args.loop:
-        if not args.no_quotes:
-            quotes_cycle()
-        news_cycle()
-        factors_cycle()
+    if args.loop:
+        loop(args.hours, not args.no_quotes)
         return
-    last_news = last_quotes = last_factors = 0.0
-    log("Bots démarrés (Ctrl+C pour arrêter)")
-    while True:
-        now = datetime.now()
-        t = time.time()
-        try:
-            if not args.no_quotes and in_session(now) and t - last_quotes >= config.QUOTE_REFRESH_MINUTES * 60:
-                quotes_cycle()
-                last_quotes = t
-            if t - last_news >= config.NEWS_REFRESH_MINUTES * 60:
-                news_cycle()
-                last_news = t
-            if t - last_factors >= 24 * 3600:
-                factors_cycle()
-                last_factors = t
-        except Exception as e:  # noqa: BLE001
-            log(f"Erreur : {e}")
-        time.sleep(30)
+    cycles = [("Veille", news_cycle), ("Indicateurs", factors_cycle), ("BOC", boc_cycle)]
+    if not args.no_quotes:
+        cycles.insert(0, ("Cours", quotes_cycle))
+    ok = sum(run_safely(name, c) for name, c in cycles)
+    log.info("%s cycles sur %s réussis", ok, len(cycles))
 
 
 if __name__ == "__main__":

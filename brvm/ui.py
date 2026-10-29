@@ -1,4 +1,5 @@
 """Éléments d'interface à la charte Elixir (thème Nuit) : styles, formats, graphiques."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -40,24 +41,38 @@ h1 {{ font-weight: 800 !important; }}
 </style>
 """
 
-pio.templates["elixir"] = go.layout.Template(layout=dict(
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family=f"{SANS}, sans-serif", color=BODY, size=13),
-    colorway=[AZUR, ACCENT, "#4F7FBF", "#A9C6EE", "#2F5E9E", "#C9D8EC", MUTED],
-    xaxis=dict(gridcolor=LINE, linecolor=LINE, zeroline=False, tickfont=dict(family=MONO, color=MUTED, size=11)),
-    yaxis=dict(gridcolor=LINE, linecolor=LINE, zeroline=False, tickfont=dict(family=MONO, color=MUTED, size=11)),
-    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=BODY)),
-    margin=dict(l=10, r=10, t=40, b=10),
-    hoverlabel=dict(font=dict(family=MONO)),
-    title=dict(font=dict(family=DISP, color=PAPER, size=17)),
-))
+pio.templates["elixir"] = go.layout.Template(
+    layout={
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(0,0,0,0)",
+        "font": {"family": f"{SANS}, sans-serif", "color": BODY, "size": 13},
+        "colorway": [AZUR, ACCENT, "#4F7FBF", "#A9C6EE", "#2F5E9E", "#C9D8EC", MUTED],
+        "xaxis": {
+            "gridcolor": LINE,
+            "linecolor": LINE,
+            "zeroline": False,
+            "tickfont": {"family": MONO, "color": MUTED, "size": 11},
+        },
+        "yaxis": {
+            "gridcolor": LINE,
+            "linecolor": LINE,
+            "zeroline": False,
+            "tickfont": {"family": MONO, "color": MUTED, "size": 11},
+        },
+        "legend": {"bgcolor": "rgba(0,0,0,0)", "font": {"color": BODY}},
+        "margin": {"l": 10, "r": 10, "t": 40, "b": 10},
+        "hoverlabel": {"font": {"family": MONO}},
+        "title": {"font": {"family": DISP, "color": PAPER, "size": 17}},
+    }
+)
 pio.templates.default = "elixir"
 
 
 @st.cache_resource
-def _init_db():
+def _init_db() -> bool:
     db.init()
     from .data import loader
+
     if db.df("SELECT 1 FROM dividends LIMIT 1").empty:
         loader.load_dividends()
     return True
@@ -104,8 +119,11 @@ def metric_cards(items: list[tuple[str, str, bool]]) -> None:
     """items : (valeur, libellé, mise en avant)."""
     cols = st.columns(len(items))
     for col, (value, sub, hl) in zip(cols, items, strict=True):
-        col.markdown(f'<div class="elx-card{" hl" if hl else ""}"><div class="elx-metric">{value}</div>'
-                     f'<div class="elx-sub">{sub}</div></div>', unsafe_allow_html=True)
+        col.markdown(
+            f'<div class="elx-card{" hl" if hl else ""}"><div class="elx-metric">{value}</div>'
+            f'<div class="elx-sub">{sub}</div></div>',
+            unsafe_allow_html=True,
+        )
 
 
 def colored(x: float, text: str | None = None) -> str:
@@ -119,14 +137,20 @@ def sidebar() -> None:
         q = db.last_update("quotes") or db.last_update("prices")
         n = db.last_update("news")
         src = db.get_setting("quotes_source", "—")
-        st.markdown(f'<p class="elx-sub">Cours : <span class="elx-num">{q or "jamais"}</span><br>'
-                    f'Source : {src}<br>Veille : <span class="elx-num">{n or "jamais"}</span> (UTC)</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="elx-sub">Cours : <span class="elx-num">{q or "jamais"}</span><br>'
+            f'Source : {src}<br>Veille : <span class="elx-num">{n or "jamais"}</span> (UTC)</p>',
+            unsafe_allow_html=True,
+        )
 
 
 def no_data_warning() -> bool:
     from . import market
+
     if market.has_data():
         return False
-    st.warning("Aucun cours en base. Va dans **Réglages** pour importer ton historique BRVM_DATA_SCRAP "
-               "ou télécharger les cours depuis Sika Finance.")
+    st.warning(
+        "Aucun cours en base. Va dans **Réglages** pour importer ton historique BRVM_DATA_SCRAP "
+        "ou télécharger les cours depuis Sika Finance."
+    )
     return True

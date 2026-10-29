@@ -1,4 +1,5 @@
 """Base de test isolée remplie de cours synthétiques (aucun accès réseau)."""
+
 import os
 import sys
 import tempfile

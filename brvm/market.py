@@ -1,4 +1,5 @@
 """Lecture des données de marché : cours ajustés, rendements, cotation du jour, dividendes."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -19,6 +20,8 @@ def _split_factors() -> pd.DataFrame:
 
 def close_panel(years: float | None = None, adjusted: bool = True, tickers: list[str] | None = None) -> pd.DataFrame:
     """Cours de clôture (dates en lignes, tickers en colonnes), ajustés des fractionnements."""
+    if years is not None and years <= 0:
+        raise ValueError(f"nombre d'années positif attendu (reçu {years})")
     q = "SELECT ticker, date, close FROM prices"
     params: tuple = ()
     if years:
@@ -61,8 +64,9 @@ def latest_quotes() -> pd.DataFrame:
     panel = close_panel(years=1.2)
     if panel.empty:
         return pd.DataFrame()
-    vol = db.df("SELECT ticker, date, volume, close FROM prices WHERE date >= ?",
-                ((date.today() - timedelta(days=365)).isoformat(),))
+    vol = db.df(
+        "SELECT ticker, date, volume, close FROM prices WHERE date >= ?", ((date.today() - timedelta(days=365)).isoformat(),)
+    )
     vol["value"] = vol["volume"].fillna(0) * vol["close"].fillna(0)
     avg_value = vol.groupby("ticker")["value"].mean()
     secs = securities()
@@ -76,16 +80,19 @@ def latest_quotes() -> pd.DataFrame:
         prev = s.iloc[-2] if len(s) > 1 else np.nan
         ytd_base = s[s.index < year_start]
         ytd = last / ytd_base.iloc[-1] - 1 if not ytd_base.empty else np.nan
-        rows.append({
-            "ticker": t,
-            "name": secs.loc[t, "name"] if t in secs.index else universe.INDEX_TICKERS.get(t, t),
-            "sector": secs.loc[t, "sector"] if t in secs.index else "Indice",
-            "country": secs.loc[t, "country"] if t in secs.index else "",
-            "last": last, "date": last_date.date(),
-            "change_day": last / prev - 1 if prev and not np.isnan(prev) else np.nan,
-            "change_ytd": ytd,
-            "avg_daily_value": avg_value.get(t, np.nan),
-        })
+        rows.append(
+            {
+                "ticker": t,
+                "name": secs.loc[t, "name"] if t in secs.index else universe.INDEX_TICKERS.get(t, t),
+                "sector": secs.loc[t, "sector"] if t in secs.index else "Indice",
+                "country": secs.loc[t, "country"] if t in secs.index else "",
+                "last": last,
+                "date": last_date.date(),
+                "change_day": last / prev - 1 if prev and not np.isnan(prev) else np.nan,
+                "change_ytd": ytd,
+                "avg_daily_value": avg_value.get(t, np.nan),
+            }
+        )
     q = pd.DataFrame(rows).set_index("ticker")
     y = dividend_yields(q["last"])
     q["div_net"] = y["div_net"]

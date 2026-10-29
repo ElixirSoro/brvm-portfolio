@@ -7,6 +7,7 @@ s.c. Σw = 1, 0 ≤ w_i ≤ max_weight, Σ_secteur w ≤ max_sector
 Σ : covariance hebdomadaire rétrécie vers une corrélation constante (Ledoit-Wolf 2003), annualisée
 Un actif « Obligations » (rendement fixe, faible volatilité) est ajouté : λ fixe naturellement la part prudente.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -18,6 +19,13 @@ from scipy.optimize import minimize
 from . import config, fees as fees_mod, market
 
 BOND = "OBLIG"
+MAX_PRUNE_ROUNDS = 6  # ré-optimisations successives après retrait des lignes trop petites
+SLSQP_MAXITER = 500
+SLSQP_FTOL = 1e-10
+ZERO_WEIGHT = 1e-6
+DUST_WEIGHT = 1e-4
+FRONTIER_LAMBDAS = (0.8, 60.0)
+MAX_FRONTIER_POINTS = 100
 
 
 def shrunk_cov(x: np.ndarray, intensity: float = 0.3) -> np.ndarray:
@@ -27,6 +35,10 @@ def shrunk_cov(x: np.ndarray, intensity: float = 0.3) -> np.ndarray:
     supposé sans risque (ce que ferait un rétrécissement vers l'identité).
     x : T x N rendements.
     """
+    if x.ndim != 2 or x.shape[0] < 2:
+        raise ValueError("matrice T x N de rendements attendue, au moins 2 dates")
+    if not 0 <= intensity <= 1:
+        raise ValueError(f"intensité de rétrécissement entre 0 et 1 (reçu {intensity})")
     x = x - x.mean(axis=0)
     t, n = x.shape
     s = x.T @ x / max(t - 1, 1)
@@ -34,7 +46,7 @@ def shrunk_cov(x: np.ndarray, intensity: float = 0.3) -> np.ndarray:
     corr = s / np.outer(sd, sd)
     rbar = (corr.sum() - n) / (n * (n - 1)) if n > 1 else 0.0
     target = rbar * np.outer(sd, sd)
-    np.fill_diagonal(target, sd ** 2)
+    np.fill_diagonal(target, sd**2)
     return intensity * target + (1 - intensity) * s
 
 
@@ -49,8 +61,12 @@ class Inputs:
     excluded: dict = field(default_factory=dict)
 
 
-def estimate(params: dict | None = None, returns: pd.DataFrame | None = None,
-             quotes: pd.DataFrame | None = None, signals: pd.Series | None = None) -> Inputs:
+def estimate(
+    params: dict | None = None,
+    returns: pd.DataFrame | None = None,
+    quotes: pd.DataFrame | None = None,
+    signals: pd.Series | None = None,
+) -> Inputs:
     p = {**config.DEFAULT_OPTIM, **(params or {})}
     rets = returns if returns is not None else market.weekly_returns(years=p["history_years"])
     q = quotes if quotes is not None else market.latest_quotes()
@@ -86,7 +102,7 @@ def estimate(params: dict | None = None, returns: pd.DataFrame | None = None,
 
 
 def _with_bond(inp: Inputs, p: dict) -> tuple[list[str], np.ndarray, np.ndarray, pd.Series]:
-    names = inp.tickers + [BOND]
+    names = [*inp.tickers, BOND]
     mu = np.append(inp.mu.values, p["bond_return"])
     n = len(names)
     cov = np.zeros((n, n))
@@ -97,6 +113,10 @@ def _with_bond(inp: Inputs, p: dict) -> tuple[list[str], np.ndarray, np.ndarray,
 
 
 def optimize(inp: Inputs, lam: float, params: dict | None = None, allow_bonds: bool = True) -> pd.Series:
+    if not lam > 0:
+        raise ValueError(f"aversion au risque λ strictement positive attendue (reçu {lam})")
+    if not inp.tickers:
+        raise ValueError("aucune action éligible à l'optimisation")
     p = {**config.DEFAULT_OPTIM, **(params or {})}
     names, mu, cov, sectors = _with_bond(inp, p)
     n = len(names)
@@ -109,7 +129,7 @@ def optimize(inp: Inputs, lam: float, params: dict | None = None, allow_bonds: b
         lower[-1] = p["bond_min"]
     active = np.ones(n, dtype=bool)
 
-    for _ in range(6):
+    for _ in range(MAX_PRUNE_ROUNDS):
         bounds = [(lower[i], upper[i] if active[i] else 0.0) for i in range(n)]
         cons = [{"type": "eq", "fun": lambda w: w.sum() - 1}]
         for sec in sectors.unique():
@@ -119,94 +139,152 @@ def optimize(inp: Inputs, lam: float, params: dict | None = None, allow_bonds: b
             cons.append({"type": "ineq", "fun": lambda w, idx=idx: p["max_sector"] - w[idx].sum()})
         x0 = np.array([b[1] for b in bounds], dtype=float)
         x0 = x0 / x0.sum() if x0.sum() > 0 else np.full(n, 1 / n)
-        res = minimize(lambda w: -(mu @ w - lam / 2 * w @ cov @ w), x0,
-                       jac=lambda w: -(mu - lam * cov @ w), bounds=bounds, constraints=cons,
-                       method="SLSQP", options={"maxiter": 500, "ftol": 1e-10})
+        res = minimize(
+            lambda w: -(mu @ w - lam / 2 * w @ cov @ w),
+            x0,
+            jac=lambda w: -(mu - lam * cov @ w),
+            bounds=bounds,
+            constraints=cons,
+            method="SLSQP",
+            options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
+        )
         w = np.clip(res.x, 0, None)
-        small = (w > 1e-6) & (w < p["min_weight"]) & (np.arange(n) != n - 1)
+        small = (w > ZERO_WEIGHT) & (w < p["min_weight"]) & (np.arange(n) != n - 1)
         if not small.any():
             break
         active &= ~small
     w = pd.Series(w, index=names)
-    w[w < 1e-4] = 0
-    return w / w.sum()
+    w[w < DUST_WEIGHT] = 0
+    if w.sum() <= 0:
+        raise ValueError("l'optimiseur n'a trouvé aucune solution admissible")
+    w = w / w.sum()
+    assert (w >= 0).all() and abs(w.sum() - 1) < 1e-9
+    return w
 
 
 def stats(w: pd.Series, inp: Inputs, params: dict | None = None) -> dict:
     p = {**config.DEFAULT_OPTIM, **(params or {})}
     names, mu, cov, _ = _with_bond(inp, p)
+    if not set(w.index) <= set(names):
+        raise ValueError(f"poids hors univers : {sorted(set(w.index) - set(names))[:5]}")
     wv = w.reindex(names).fillna(0).values
     ret = float(mu @ wv)
     vol = float(np.sqrt(wv @ cov @ wv))
     div = float((inp.yields.reindex(names).fillna(0).values * wv)[:-1].sum())
     return {
-        "expected_return": ret, "volatility": vol,
+        "expected_return": ret,
+        "volatility": vol,
         "sharpe": (ret - p["bond_return"]) / vol if vol > 0 else np.nan,
-        "dividend_yield": div, "equity_share": float(1 - w.get(BOND, 0)),
+        "dividend_yield": div,
+        "equity_share": float(1 - w.get(BOND, 0)),
         "lines": int((w[w.index != BOND] > 0).sum()),
         "bad_year_95": ret - 1.645 * vol,  # perte d'une mauvaise année sur 20 (approximation normale)
     }
 
 
 def frontier(inp: Inputs, params: dict | None = None, points: int = 25) -> pd.DataFrame:
+    """Frontière efficiente : une optimisation par valeur de λ entre FRONTIER_LAMBDAS."""
+    if not 2 <= points <= MAX_FRONTIER_POINTS:
+        raise ValueError(f"points entre 2 et {MAX_FRONTIER_POINTS} (reçu {points})")
     rows = []
-    for lam in np.geomspace(0.8, 60, points):
+    for lam in np.geomspace(*FRONTIER_LAMBDAS, points):
         w = optimize(inp, lam, params)
         s = stats(w, inp, params)
-        rows.append({"lambda": lam, "volatility": s["volatility"], "expected_return": s["expected_return"],
-                     "equity_share": s["equity_share"]})
+        rows.append(
+            {
+                "lambda": lam,
+                "volatility": s["volatility"],
+                "expected_return": s["expected_return"],
+                "equity_share": s["equity_share"],
+            }
+        )
     return pd.DataFrame(rows)
+
+
+def _round_down(qty: pd.Series, prices: pd.Series, left: float, f: dict) -> tuple[pd.Series, float]:
+    """Frais minimums plus lourds que prévu : retire une action aux plus grosses lignes (au plus qty.sum() fois)."""
+    for _ in range(int(qty.sum())):
+        if left >= 0:
+            break
+        t = (qty * prices).idxmax()
+        before = fees_mod.buy_cost(qty[t], prices[t], f)[0]
+        qty[t] -= 1
+        after = fees_mod.buy_cost(qty[t], prices[t], f)[0] if qty[t] else 0
+        left += before - after
+    return qty, left
+
+
+def _quantities(target: pd.Series, prices: pd.Series, budget: float, f: dict) -> pd.Series:
+    """Quantités entières d'actions dont le coût total, frais compris, tient dans le budget."""
+    est_fee = 1 + (f["courtage_pct"] * (1 + f["tva_courtage_pct"] / 100) + f["brvm_pct"] + f["dcbr_pct"] + f["amf_pct"]) / 100
+    qty = np.floor(target / est_fee / prices).astype(int)
+    spent = sum(fees_mod.buy_cost(qty[t], prices[t], f)[0] for t in qty.index if qty[t] > 0)
+    qty, left = _round_down(qty, prices, budget - spent, f)
+    # reliquat : une action de plus aux lignes les plus sous-pondérées tant que le budget le permet
+    for t in (target - qty * prices).sort_values(ascending=False).index:
+        extra = fees_mod.buy_cost(qty[t] + 1, prices[t], f)[0] - (fees_mod.buy_cost(qty[t], prices[t], f)[0] if qty[t] else 0)
+        if extra <= left:
+            qty[t] += 1
+            left -= extra
+    assert left >= -1e-6 or qty.sum() == 0, "budget dépassé"
+    return qty
+
+
+def _bond_row(weight: float, amount: float, unit: float) -> dict:
+    rate = config.DEFAULT_OPTIM["bond_return"]
+    return {
+        "ticker": BOND,
+        "name": "Obligations d'État UEMOA",
+        "sector": "Obligations",
+        "weight_target": weight,
+        "quantity": int(amount / unit),
+        "price": unit,
+        "gross": amount,
+        "fees": 0.0,
+        "total": amount,
+        "expected_return": rate,
+        "yield_net": rate,
+    }
 
 
 def to_orders(w: pd.Series, inp: Inputs, capital: float, bond_unit: float = 10_000) -> pd.DataFrame:
     """Transforme des poids en quantités entières, frais d'achat compris."""
+    if capital <= 0 or bond_unit <= 0:
+        raise ValueError("capital et coupure obligataire doivent être positifs")
+    if w.lt(-1e-9).any():
+        raise ValueError("poids négatifs")
     f = fees_mod.current_fees()
-    rows = []
-    budget = capital
     bond_amount = np.floor(capital * w.get(BOND, 0) / bond_unit) * bond_unit
-    budget -= bond_amount
     eq = w.drop(BOND, errors="ignore")
     eq = eq[eq > 0]
-    est_fee = 1 + (f["courtage_pct"] * (1 + f["tva_courtage_pct"] / 100) + f["brvm_pct"] + f["dcbr_pct"] + f["amf_pct"]) / 100
-    target = capital * eq
-    qty = np.floor(target / est_fee / inp.prices.reindex(eq.index)).astype(int)
-    spent = 0.0
-    for t in eq.index:
-        cost, of = fees_mod.buy_cost(qty[t], inp.prices[t], f)
-        spent += cost if qty[t] > 0 else 0
-    left = budget - spent
-    # frais minimums plus lourds que prévu : on retire une action aux plus grosses lignes
-    while left < 0 and qty.sum() > 0:
-        t = (qty * inp.prices.reindex(eq.index)).idxmax()
-        before = fees_mod.buy_cost(qty[t], inp.prices[t], f)[0]
-        qty[t] -= 1
-        after = fees_mod.buy_cost(qty[t], inp.prices[t], f)[0] if qty[t] else 0
-        left += before - after
-    # reliquat : une action de plus aux lignes les plus sous-pondérées tant que le budget le permet
-    for t in (target - qty * inp.prices.reindex(eq.index)).sort_values(ascending=False).index:
-        price = inp.prices[t]
-        extra_cost = fees_mod.buy_cost(qty[t] + 1, price, f)[0] - (fees_mod.buy_cost(qty[t], price, f)[0] if qty[t] else 0)
-        if extra_cost <= left:
-            qty[t] += 1
-            left -= extra_cost
+    prices = inp.prices.reindex(eq.index)
+    qty = _quantities(capital * eq, prices, capital - bond_amount, f)
     secs = market.securities()
-    for t in eq.index:
-        if qty[t] <= 0:
-            continue
-        cost, of = fees_mod.buy_cost(qty[t], inp.prices[t], f)
-        rows.append({"ticker": t, "name": secs.loc[t, "name"], "sector": secs.loc[t, "sector"],
-                     "weight_target": eq[t], "quantity": int(qty[t]), "price": inp.prices[t],
-                     "gross": qty[t] * inp.prices[t], "fees": of.total, "total": cost,
-                     "expected_return": inp.mu[t], "yield_net": inp.yields.get(t, 0)})
+    rows = []
+    for t in eq.index[qty[eq.index] > 0]:
+        cost, of = fees_mod.buy_cost(qty[t], prices[t], f)
+        rows.append(
+            {
+                "ticker": t,
+                "name": secs.loc[t, "name"],
+                "sector": secs.loc[t, "sector"],
+                "weight_target": eq[t],
+                "quantity": int(qty[t]),
+                "price": prices[t],
+                "gross": qty[t] * prices[t],
+                "fees": of.total,
+                "total": cost,
+                "expected_return": inp.mu[t],
+                "yield_net": inp.yields.get(t, 0),
+            }
+        )
     if bond_amount > 0:
-        rows.append({"ticker": BOND, "name": "Obligations d'État UEMOA", "sector": "Obligations",
-                     "weight_target": w[BOND], "quantity": int(bond_amount / bond_unit), "price": bond_unit,
-                     "gross": bond_amount, "fees": 0.0, "total": bond_amount,
-                     "expected_return": config.DEFAULT_OPTIM["bond_return"], "yield_net": config.DEFAULT_OPTIM["bond_return"]})
+        rows.append(_bond_row(float(w[BOND]), float(bond_amount), bond_unit))
     out = pd.DataFrame(rows)
-    if not out.empty:
-        out["weight_real"] = out["gross"] / out["total"].sum()
-    return out.sort_values("total", ascending=False).reset_index(drop=True) if not out.empty else out
+    if out.empty:
+        return out
+    out["weight_real"] = out["gross"] / out["total"].sum()
+    return out.sort_values("total", ascending=False).reset_index(drop=True)
 
 
 def portfolio_history(w: pd.Series, years: float = 5) -> pd.Series:

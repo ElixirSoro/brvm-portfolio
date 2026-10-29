@@ -2,7 +2,7 @@
 
 Logiciel local pour construire, simuler et suivre un portefeuille d'actions de la BRVM selon son aversion au risque, avec une veille automatique de tout ce qui peut faire bouger les cours.
 
-Version 0.1 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHITECTURE.md).
+Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Ce qu'il fait
 
@@ -13,6 +13,7 @@ Version 0.1 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 | Profil et optimiseur | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
 | Simulations | Monte-Carlo sur 1 à 30 ans : fourchette des résultats, probabilité d'atteindre l'objectif, versement nécessaire |
 | Mon portefeuille | Copie virtuelle du portefeuille réel : opérations, frais, dividendes nets d'IRVM, droits de garde, performance vs BRVM Composite |
+| Documents officiels | Lecture des Bulletins Officiels de la Cote (cours officiels, PER, rendements, indices, communiqués, assemblées générales) et des états financiers publiés par les sociétés sur brvm.org |
 | Veille | Bots qui collectent l'actualité (CI, UEMOA, Afrique, monde) et notent l'impact par action ; matières premières, change, taux |
 | Réglages | Import de l'historique, grille de frais SGI, IRVM, calendrier des dividendes, clé IA, flux RSS |
 
@@ -31,8 +32,9 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py                 # l'application
 python -m brvm.bots.run              # un passage des bots
-python -m brvm.bots.run --loop       # les bots en continu (ou « Lancer les bots.command »)
+python -m brvm.bots.run --loop       # les bots pendant 7 jours (--hours pour changer ; ou « Lancer les bots.command »)
 pytest -q                            # les tests
+ruff check . && mypy brvm            # contrôle qualité (zéro avertissement attendu)
 ```
 
 ## Bon à savoir
@@ -43,13 +45,15 @@ pytest -q                            # les tests
 - **Frais** : les valeurs par défaut sont des ordres de grandeur. Le courtage minimum par ordre pèse lourd sur les petits montants : la page Simulations le montre, et il vaut mieux regrouper les versements en un ordre tous les 2 à 3 mois.
 - **Optimiseur** : les performances passées sont volontairement « rabotées » vers une hausse de long terme de 5 % par an. 2024 à 2026 ont été exceptionnelles et ne doivent pas être extrapolées sur 10 ans. Le réglage est modifiable dans les options avancées.
 - **Veille** : les scores sont une aide à la lecture, pas des recommandations. La carte des facteurs (`brvm/bots/exposures.py`) est à enrichir : c'est elle qui décide quelles actualités chercher et quelles actions elles touchent.
+- **BOC** : le lecteur refuse un bulletin où il trouve moins de 30 valeurs, plutôt que d'enregistrer des chiffres douteux. Les nombres du PDF n'ont pas de séparateur de milliers fiable : chaque découpage possible est testé contre la variation publiée et la valeur échangée.
+- **États financiers** : les PDF textes sont lus par règles (chiffre d'affaires, PNB, résultat d'exploitation, résultat net, total bilan, capitaux propres) avec une confiance « faible » à vérifier ; les PDF scannés exigent la clé API Claude. Chaque nouveau rapport publié apparaît aussi dans la Veille comme information endogène.
 - Toutes les données restent dans `data/brvm.db` sur ton Mac. Seuls les titres et résumés d'articles sont envoyés à l'API Claude quand la clé est renseignée.
 
 ## Structure
 
 ```
 app.py                  navigation de l'application
-views/                  les 7 pages
+views/                  les 8 pages
 brvm/
   config.py             chemins, frais et paramètres par défaut
   universe.py           les 48 valeurs, secteurs, pays, fractionnements
@@ -57,6 +61,12 @@ brvm/
   data/sika.py          client Sika Finance (cours, historique)
   data/brvm_site.py     secours : page des cours de brvm.org
   data/quotes.py        choix de la source (Sika, puis brvm.org)
+  data/boc.py           lecture des Bulletins Officiels de la Cote
+  data/reports.py       liste et téléchargement des rapports des sociétés
+  data/issuers.py       noms des émetteurs ↔ tickers
+  data/frnum.py         nombres au format français des PDF
+  analysis/financials.py extraction des grands postes (règles ou IA)
+  documents.py          import des BOC et des rapports, analyse
   data/loader.py        import de BRVM_DATA_SCRAP et des dividendes
   market.py             cours ajustés, rendements, dividendes
   fees.py               frais d'ordre et droits de garde
@@ -67,5 +77,21 @@ brvm/
   bots/                 exposures, sources, collector, analyst, signals, run
   ui.py                 charte graphique (thème Nuit)
 data/dividendes.csv     calendrier des dividendes
-tests/                  31 tests sur données synthétiques
+tests/                  98 tests (données synthétiques, extraits réels de BOC et de rapports, conformité)
 ```
+
+## Fiabilité du code
+
+Le code suit les règles NASA/JPL « Power of 10 » adaptées à Python (skill `code-fiable-nasa`) :
+boucles bornées, pas de récursion, fonctions de 60 lignes et 5 paramètres au plus, erreurs explicites
+(jamais `except Exception`), journalisation plutôt que `print`, constantes nommées, typage complet,
+`ruff` et `mypy` sans avertissement. `tests/test_conformite.py` vérifie automatiquement les règles
+mesurables à chaque `pytest`.
+
+Dérogations assumées :
+
+- **Densité d'assertions** : la règle demande 2 contrôles par fonction en moyenne ; le code en compte environ 0,6.
+  Les contrôles sont concentrés sur les entrées publiques (calculs, lecture de documents, réseau) ; les petites
+  fonctions d'affichage et d'accès à la base n'en ont pas.
+- **Pages Streamlit** (`views/`) : scripts exécutés de haut en bas, donc hors du découpage en fonctions.
+- **pandas / scipy** : allocation dynamique et typage partiel inhérents à ces bibliothèques.

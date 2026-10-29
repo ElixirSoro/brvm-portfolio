@@ -1,10 +1,13 @@
 """Base SQLite locale : schéma et accès."""
+
 from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -50,6 +53,25 @@ CREATE TABLE IF NOT EXISTS factors (
     code TEXT, date TEXT, value REAL, PRIMARY KEY (code, date)
 );
 CREATE TABLE IF NOT EXISTS updates (what TEXT PRIMARY KEY, at TEXT);
+CREATE TABLE IF NOT EXISTS boc_quotes (
+    date TEXT, ticker TEXT, prev REAL, open REAL, close REAL, change REAL, volume REAL, value REAL, ref REAL,
+    change_ytd REAL, div_net REAL, div_date TEXT, yield_net REAL, per REAL, sector TEXT, suspended INTEGER,
+    PRIMARY KEY (date, ticker)
+);
+CREATE TABLE IF NOT EXISTS boc_market (
+    date TEXT PRIMARY KEY, composite REAL, brvm30 REAL, prestige REAL, per_market REAL, capitalisation REAL, url TEXT
+);
+CREATE TABLE IF NOT EXISTS events (
+    date TEXT, ticker TEXT, kind TEXT, title TEXT, source TEXT, PRIMARY KEY (date, ticker, kind, title)
+);
+CREATE TABLE IF NOT EXISTS reports (
+    url TEXT PRIMARY KEY, ticker TEXT, title TEXT, kind TEXT, period TEXT, published TEXT,
+    analyzed INTEGER DEFAULT 0, method TEXT, note TEXT
+);
+CREATE TABLE IF NOT EXISTS financials (
+    ticker TEXT, period TEXT, metric TEXT, current REAL, previous REAL, method TEXT, confidence TEXT, url TEXT,
+    PRIMARY KEY (ticker, period, metric)
+);
 """
 
 
@@ -62,7 +84,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 
 
 @contextmanager
-def session(path: Path | None = None):
+def session(path: Path | None = None) -> Iterator[sqlite3.Connection]:
     con = connect(path)
     try:
         yield con
@@ -89,7 +111,7 @@ def df(sql: str, params: tuple = (), path: Path | None = None) -> pd.DataFrame:
 def execute(sql: str, params: tuple = (), path: Path | None = None) -> int:
     with session(path) as con:
         cur = con.execute(sql, params)
-        return cur.lastrowid
+        return cur.lastrowid or 0
 
 
 def executemany(sql: str, rows: list[tuple], path: Path | None = None) -> None:
@@ -97,13 +119,13 @@ def executemany(sql: str, rows: list[tuple], path: Path | None = None) -> None:
         con.executemany(sql, rows)
 
 
-def get_setting(key: str, default=None, path: Path | None = None):
+def get_setting(key: str, default: Any = None, path: Path | None = None) -> Any:
     with session(path) as con:
         row = con.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return json.loads(row["value"]) if row else default
 
 
-def set_setting(key: str, value, path: Path | None = None) -> None:
+def set_setting(key: str, value: Any, path: Path | None = None) -> None:
     execute("INSERT OR REPLACE INTO settings VALUES (?,?)", (key, json.dumps(value)), path)
 
 
