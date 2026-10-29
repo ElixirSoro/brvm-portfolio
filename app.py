@@ -4,7 +4,7 @@ import streamlit as st
 
 from brvm import ui
 
-st.set_page_config(page_title="BRVM Portfolio", page_icon="◆", layout="wide")
+st.set_page_config(page_title=ui.APP_NAME, page_icon="◆", layout="wide")
 
 pages = [
     st.Page("views/accueil.py", title="Accueil", icon=":material/home:", default=True),
