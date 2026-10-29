@@ -26,6 +26,13 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 # Modèle léger par défaut pour limiter le coût de la veille ; modifiable dans .env
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 
+# Comptes utilisateurs (Supabase Auth) : actifs dès que la base est PostgreSQL (version en ligne).
+# La clé « publishable » est faite pour être publique ; les tables restent fermées à l'API publique (RLS).
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qgacshdterhwnyhylazq.supabase.co").rstrip("/")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_CWAG_-M47-QAgMJKaOrx2g_2SH23C5e")
+# Administrateurs : seuls autorisés à modifier les données communes (historique, BOC, veille, IA)
+ADMIN_EMAILS = frozenset(e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "elixirsoro1@gmail.com").split(",") if e.strip())
+
 # Séance BRVM (heure d'Abidjan = GMT)
 SESSION_OPEN_HOUR = 9
 SESSION_CLOSE_HOUR = 15

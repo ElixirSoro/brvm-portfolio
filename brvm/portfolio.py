@@ -18,7 +18,7 @@ from typing import Any, IO
 import numpy as np
 import pandas as pd
 
-from . import config, db, fees as fees_mod, market
+from . import auth, config, db, fees as fees_mod, market
 
 TYPES = ["DEPOT", "RETRAIT", "ACHAT", "VENTE", "DIVIDENDE", "COUPON", "FRAIS"]
 CASH_SIGN = {"DEPOT": 1, "RETRAIT": -1, "ACHAT": -1, "VENTE": 1, "DIVIDENDE": 1, "COUPON": 1, "FRAIS": -1}
@@ -29,20 +29,34 @@ QTY_EPS = 1e-9
 
 
 # ---------- portefeuilles ----------
+OWNED = "COALESCE(owner, 'local') = ?"  # portefeuilles d'avant les comptes : rattachés au mode local
+
+
 def create(name: str, note: str = "") -> int:
-    """Crée un portefeuille vide ; renvoie son identifiant."""
+    """Crée un portefeuille vide pour le propriétaire courant ; renvoie son identifiant."""
     if not name.strip():
         raise ValueError("nom de portefeuille vide")
-    return db.execute("INSERT INTO portfolios (name, note) VALUES (?, ?)", (name, note))
+    if not db.df(f"SELECT 1 FROM portfolios WHERE name=? AND {OWNED}", (name, auth.owner())).empty:
+        raise ValueError(f"tu as déjà un portefeuille nommé « {name} »")
+    return db.execute("INSERT INTO portfolios (name, note, owner) VALUES (?, ?, ?)", (name, note, auth.owner()))
 
 
 def list_all() -> pd.DataFrame:
-    """Portefeuilles virtuels enregistrés."""
-    return db.df("SELECT * FROM portfolios ORDER BY id")
+    """Portefeuilles virtuels du propriétaire courant."""
+    return db.df(f"SELECT * FROM portfolios WHERE {OWNED} ORDER BY id", (auth.owner(),))
+
+
+def check_owner(pid: int) -> None:
+    """PermissionError si le portefeuille n'existe pas ou n'appartient pas au propriétaire courant."""
+    if pid <= 0:
+        raise ValueError(f"portefeuille invalide : {pid}")
+    if db.df(f"SELECT 1 FROM portfolios WHERE id=? AND {OWNED}", (pid, auth.owner())).empty:
+        raise PermissionError(f"portefeuille {pid} introuvable dans ton compte")
 
 
 def delete(pid: int) -> None:
     """Supprime un portefeuille et toutes ses opérations."""
+    check_owner(pid)
     db.execute("DELETE FROM transactions WHERE portfolio_id=?", (pid,))
     db.execute("DELETE FROM portfolios WHERE id=?", (pid,))
 
@@ -68,7 +82,7 @@ def _dividend_tax(op: Operation, gross: float) -> float:
     if not (op.dividend_is_gross and op.ticker):
         return 0.0
     country = market.securities()["country"].get(op.ticker, "ci")
-    rate = float(db.get_setting("irvm", config.DEFAULT_IRVM).get(country, DEFAULT_IRVM_PCT)) / 100
+    rate = float(auth.get_user_setting("irvm", config.DEFAULT_IRVM).get(country, DEFAULT_IRVM_PCT)) / 100
     return gross * rate  # IRVM retenu à la source
 
 
@@ -95,8 +109,7 @@ def amounts(op: Operation) -> tuple[float, float, float]:
 
 def add(pid: int, op: Operation) -> int:
     """Enregistre une opération dans le portefeuille `pid` ; renvoie son identifiant."""
-    if pid <= 0:
-        raise ValueError(f"portefeuille invalide : {pid}")
+    check_owner(pid)
     op = replace(op, kind=op.kind.upper(), ticker=(op.ticker or "").upper() or None)
     gross, fees, net = amounts(op)
     if op.kind == "VENTE":
@@ -112,12 +125,17 @@ def add(pid: int, op: Operation) -> int:
 
 
 def remove(tx_id: int) -> None:
-    """Supprime une opération."""
+    """Supprime une opération d'un portefeuille du propriétaire courant."""
+    row = db.df("SELECT portfolio_id FROM transactions WHERE id=?", (tx_id,))
+    if row.empty:
+        raise ValueError(f"opération {tx_id} introuvable")
+    check_owner(int(row["portfolio_id"].iloc[0]))
     db.execute("DELETE FROM transactions WHERE id=?", (tx_id,))
 
 
 def transactions(pid: int) -> pd.DataFrame:
     """Opérations d'un portefeuille, avec quantités et cours convertis en actions actuelles (fractionnements)."""
+    check_owner(pid)
     tx = db.df("SELECT * FROM transactions WHERE portfolio_id=? ORDER BY date, id", (pid,))
     if tx.empty:
         return tx

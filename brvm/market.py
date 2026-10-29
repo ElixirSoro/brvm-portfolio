@@ -9,7 +9,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from . import config, db, universe
+from . import auth, config, db, universe
 
 
 def securities() -> pd.DataFrame:
@@ -109,7 +109,7 @@ def dividend_table() -> pd.DataFrame:
     d = db.df("SELECT * FROM dividends")
     if d.empty:
         return d
-    irvm = db.get_setting("irvm", config.DEFAULT_IRVM)
+    irvm = auth.get_user_setting("irvm", config.DEFAULT_IRVM)
     secs = securities()
     d["country"] = d["ticker"].map(secs["country"])
     rate = d["country"].map(irvm).fillna(12.0) / 100

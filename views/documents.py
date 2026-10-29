@@ -21,6 +21,7 @@ ui.setup(
     "Les Bulletins Officiels de la Cote (BOC) et les rapports des sociétés publiés sur brvm.org, "
     "lus automatiquement : cours officiels, PER, rendements, assemblées générales, comptes annuels.",
 )
+ui.locked_note()
 
 tab_boc, tab_fin, tab_events = st.tabs(["Bulletins de la cote", "États financiers", "Agenda des émetteurs"])
 
@@ -28,7 +29,7 @@ tab_boc, tab_fin, tab_events = st.tabs(["Bulletins de la cote", "États financie
 with tab_boc:
     c1, c2 = st.columns([1, 3])
     n = c1.number_input("Nombre de BOC à importer", 1, documents.MAX_BOC_BATCH, 5)
-    if c2.button("Importer les derniers BOC", icon=":material/download:"):
+    if c2.button("Importer les derniers BOC", icon=":material/download:", disabled=ui.locked()):
         bar = st.progress(0.0, "Lecture des BOC…")
         try:
             r = documents.import_latest_bocs(int(n), progress=lambda p, d: bar.progress(p, f"BOC du {d}"))
@@ -146,7 +147,7 @@ with tab_fin:
     secs = market.securities()
     c1, c2 = st.columns([2, 1])
     ticker = c1.selectbox("Société", secs.index, format_func=lambda t: f"{t} · {secs.loc[t, 'name']}")
-    if c2.button("Mettre à jour la liste des rapports", icon=":material/sync:"):
+    if c2.button("Mettre à jour la liste des rapports", icon=":material/sync:", disabled=ui.locked()):
         r = documents.refresh_reports([ticker])
         st.toast(f"{r['new']} nouveaux rapports")
         for msg in r["errors"]:
@@ -154,6 +155,7 @@ with tab_fin:
     if st.button(
         "Mettre à jour les rapports des 48 sociétés",
         help="Environ 1 minute. Les nouveaux rapports apparaissent aussi dans la Veille.",
+        disabled=ui.locked(),
     ):
         bar = st.progress(0.0, "Rapports…")
         r = documents.refresh_reports(list(secs.index), progress=bar.progress)
@@ -184,7 +186,7 @@ with tab_fin:
             disabled=not ai_ok,
             help=None if ai_ok else "Ajoute ANTHROPIC_API_KEY dans .env pour activer la lecture par IA.",
         )
-        if st.button("Analyser ce rapport", type="primary", icon=":material/query_stats:"):
+        if st.button("Analyser ce rapport", type="primary", icon=":material/query_stats:", disabled=ui.locked()):
             with st.spinner("Téléchargement et lecture du rapport…"):
                 try:
                     out = documents.analyze_report(pick, use_ai)

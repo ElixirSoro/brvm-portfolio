@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from brvm import db, fees, market, portfolio, ui
+from brvm import auth, db, fees, market, portfolio, ui
 
 ui.setup(
     "Mon portefeuille",
@@ -90,11 +90,12 @@ with tab_pos:
         )
 
         @st.cache_data(ttl=600, show_spinner="Reconstitution de l'historique…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
-        def hist(p: int, n_tx: int) -> pd.DataFrame:
-            """Historique du portefeuille ; `n_tx` invalide le cache quand une opération est ajoutée."""
+        def hist(p: int, n_tx: int, who: str) -> pd.DataFrame:
+            """Historique du portefeuille ; `n_tx` invalide le cache après une opération, `who` l'isole par compte."""
+            auth.set_owner(who)
             return portfolio.history(p)
 
-        h = hist(pid, len(portfolio.transactions(pid)))
+        h = hist(pid, len(portfolio.transactions(pid)), auth.owner())
         if not h.empty and len(h) > 2:
             fig = go.Figure()
             fig.add_trace(

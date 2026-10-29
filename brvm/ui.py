@@ -9,7 +9,7 @@ import streamlit as st
 
 from pathlib import Path
 
-from . import db
+from . import auth, db
 
 APP_NAME = "Mr investor"
 VERSION = "0.2"
@@ -157,6 +157,50 @@ def colored(x: float, text: str | None = None) -> str:
     """Texte HTML dont la classe dépend du signe de `x` (elx-pos, elx-neg ou neutre)."""
     cls = "elx-pos" if x > 0 else "elx-neg" if x < 0 else "elx-num"
     return f'<span class="{cls}">{text or pct(x, signed=True)}</span>'
+
+
+SESSION_USER = "user"
+
+
+def current_user() -> auth.User | None:
+    """Utilisateur connecté dans cette session du navigateur, ou None."""
+    data = st.session_state.get(SESSION_USER)
+    if not isinstance(data, dict):
+        return None
+    return auth.User(str(data["id"]), str(data["email"]))
+
+
+def remember(user: auth.User) -> None:
+    """Ouvre la session de l'utilisateur dans ce navigateur."""
+    st.session_state[SESSION_USER] = {"id": user.id, "email": user.email}
+
+
+def locked() -> bool:
+    """Vrai si l'utilisateur ne peut pas modifier les données communes (cours, BOC, veille, IA)."""
+    if not auth.enabled():
+        return False
+    user = current_user()
+    return user is None or not user.is_admin
+
+
+def locked_note() -> None:
+    """Explique pourquoi certains boutons sont grisés."""
+    if locked():
+        st.caption("Les mises à jour des données communes (cours, documents, veille) sont réservées à l'administrateur.")
+
+
+def account_box() -> None:
+    """Compte connecté et bouton de déconnexion, dans la barre latérale."""
+    user = current_user()
+    if user is None:
+        return
+    with st.sidebar:
+        role = " · administrateur" if user.is_admin else ""
+        st.markdown(f'<p class="elx-sub">Connecté : {user.email}{role}</p>', unsafe_allow_html=True)
+        if st.button("Se déconnecter", icon=":material/logout:"):
+            st.session_state.pop(SESSION_USER, None)
+            st.cache_data.clear()
+            st.rerun()
 
 
 def sidebar() -> None:
