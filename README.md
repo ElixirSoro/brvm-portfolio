@@ -80,6 +80,18 @@ data/dividendes.csv     calendrier des dividendes
 tests/                  98 tests (données synthétiques, extraits réels de BOC et de rapports, conformité)
 ```
 
+## Version en ligne
+
+L'application tourne aussi sur Streamlit Community Cloud (accès privé, sur invitation), branchée sur
+une base PostgreSQL Supabase (projet `brvm-portfolio`, us-east-1).
+
+- La variable `DATABASE_URL` (Secrets de l'app Streamlit, ou `.env` en local) choisit la base :
+  vide = fichier local `data/brvm.db`, renseignée = Supabase. Mettre la même valeur dans le `.env`
+  du Mac permet aux bots du Mac d'alimenter la version en ligne.
+- Les tables Supabase ont la sécurité par ligne activée sans règle : elles ne sont pas lisibles
+  depuis l'API publique, seul le serveur de l'application s'y connecte.
+- Tests sur PostgreSQL : `TEST_DATABASE_URL=postgresql://… pytest -q`.
+
 ## Fiabilité du code
 
 Le code suit les règles NASA/JPL « Power of 10 » adaptées à Python (skill `code-fiable-nasa`) :
