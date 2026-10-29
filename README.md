@@ -8,6 +8,7 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 
 | Page | Usage |
 | --- | --- |
+| Tutoriel | Les six étapes pour démarrer, la routine de suivi et les questions fréquentes, avec un lien vers chaque page |
 | Accueil | Indice du jour, plus fortes variations, signaux de veille, état des portefeuilles |
 | Marché | Les 48 valeurs : cours, variation, rendement en dividende net, liquidité, signal ; historique d'une valeur et ses actualités |
 | Profil et optimiseur | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
@@ -53,7 +54,7 @@ ruff check . && mypy brvm            # contrôle qualité (zéro avertissement a
 
 ```
 app.py                  navigation de l'application
-views/                  les 8 pages
+views/                  les 9 pages
 brvm/
   config.py             chemins, frais et paramètres par défaut
   universe.py           les 48 valeurs, secteurs, pays, fractionnements

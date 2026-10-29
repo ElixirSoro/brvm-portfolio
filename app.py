@@ -8,6 +8,7 @@ st.set_page_config(page_title="BRVM Portfolio", page_icon="◆", layout="wide")
 
 pages = [
     st.Page("views/accueil.py", title="Accueil", icon=":material/home:", default=True),
+    st.Page("views/tutoriel.py", title="Tutoriel", icon=":material/school:"),
     st.Page("views/marche.py", title="Marché", icon=":material/candlestick_chart:"),
     st.Page("views/optimiseur.py", title="Profil et optimiseur", icon=":material/tune:"),
     st.Page("views/simulations.py", title="Simulations", icon=":material/insights:"),
