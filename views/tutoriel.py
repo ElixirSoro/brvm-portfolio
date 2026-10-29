@@ -169,7 +169,7 @@ def render_step(number: int, step: Step) -> None:
 
 ui.setup(
     "Tutoriel",
-    "Bien démarrer avec BRVM Portfolio",
+    f"Bien démarrer avec {ui.APP_NAME}",
     "Six étapes pour passer d'une application vide à un portefeuille suivi au franc près, puis la routine pour "
     "le garder à jour. Chaque étape a un lien direct vers la page concernée.",
 )

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import db
 
+APP_NAME = "Mr investor"
 VERSION = "0.2"
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 LOGO, LOGO_ICON = ASSETS / "logo-elixir.svg", ASSETS / "logo-elixir-icon.svg"
@@ -161,7 +162,7 @@ def colored(x: float, text: str | None = None) -> str:
 def sidebar() -> None:
     """Barre latérale : nom du logiciel, fraîcheur des cours et de la veille."""
     with st.sidebar:
-        st.markdown('<p class="elx-label">BRVM Portfolio</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="elx-label">{APP_NAME}</p>', unsafe_allow_html=True)
         q = db.last_update("quotes") or db.last_update("prices")
         n = db.last_update("news")
         src = db.get_setting("quotes_source", "—")
@@ -183,7 +184,7 @@ def footer() -> None:
     """Pied de page à la charte : logotype et version du logiciel."""
     st.markdown(
         f'<div class="elx-foot"><span class="elx-logo">Elixir<span>.</span></span>'
-        f' · <span class="elx-num">BRVM Portfolio v{VERSION}</span></div>',
+        f' · <span class="elx-num">{APP_NAME} v{VERSION}</span></div>',
         unsafe_allow_html=True,
     )
 

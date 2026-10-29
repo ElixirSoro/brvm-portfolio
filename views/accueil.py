@@ -9,7 +9,7 @@ from brvm import market, portfolio, ui
 from brvm.bots import signals
 from brvm.data import quotes as quotes_src
 
-ui.setup("Tableau de bord", "BRVM Portfolio", "Le marché du jour, ton portefeuille et ce que les bots ont repéré.")
+ui.setup("Tableau de bord", ui.APP_NAME, "Le marché du jour, ton portefeuille et ce que les bots ont repéré.")
 if ui.no_data_warning():
     st.stop()
 
