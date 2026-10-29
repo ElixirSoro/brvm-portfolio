@@ -3,11 +3,20 @@
 Le ticker Sika Finance = ticker BRVM + "." + code pays (ex. SNTS.sn).
 Secteurs : classification BRVM simplifiée.
 """
+
 from __future__ import annotations
 
+from typing import Any
+
 COUNTRY_NAMES = {
-    "ci": "Côte d'Ivoire", "sn": "Sénégal", "bf": "Burkina Faso", "ml": "Mali",
-    "ne": "Niger", "bj": "Bénin", "tg": "Togo", "gw": "Guinée-Bissau",
+    "ci": "Côte d'Ivoire",
+    "sn": "Sénégal",
+    "bf": "Burkina Faso",
+    "ml": "Mali",
+    "ne": "Niger",
+    "bj": "Bénin",
+    "tg": "Togo",
+    "gw": "Guinée-Bissau",
 }
 
 # ticker, nom, pays, secteur
@@ -66,14 +75,15 @@ INDEX_TICKERS = {"BRVMC": "BRVM Composite", "BRVM30": "BRVM 30"}
 
 # Opérations sur titres connues (fractionnements) : ticker, date d'effet, ratio
 CORPORATE_ACTIONS = [
-    ("SNTS", "2026-10-26", 10.0),   # Sonatel, division par 10
+    ("SNTS", "2026-10-26", 10.0),  # Sonatel, division par 10
 ]
 
 
 def sika_ticker(ticker: str, country: str) -> str:
+    """Ticker Sika Finance d'une valeur (suffixe pays)."""
     return f"{ticker}.{country}"
 
 
-def by_ticker() -> dict[str, dict]:
-    return {t: {"ticker": t, "name": n, "country": c, "sector": s, "sika": sika_ticker(t, c)}
-            for t, n, c, s in SECURITIES}
+def by_ticker() -> dict[str, dict[str, Any]]:
+    """Les 48 valeurs indexées par ticker."""
+    return {t: {"ticker": t, "name": n, "country": c, "sector": s, "sika": sika_ticker(t, c)} for t, n, c, s in SECURITIES}

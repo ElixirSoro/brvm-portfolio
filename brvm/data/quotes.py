@@ -5,16 +5,24 @@ Contrat
 - Règle : si Sika renvoie moins de MIN_SIKA_OK séries (API changée, blocage, panne), on lit brvm.org.
 - Si les deux sources échouent : QuotesUnavailable avec les deux messages d'erreur.
 """
+
 from __future__ import annotations
 
-import logging
+from typing import Any
 
+import logging
+from collections.abc import Callable
+from datetime import date
+
+import pandas as pd
 import requests
 
 from .. import db
 from . import brvm_site, sika
 
-MIN_SIKA_OK = 40          # sur 50 séries (48 actions + 2 indices)
+Progress = Callable[[float, str], None]
+
+MIN_SIKA_OK = 40  # sur 50 séries (48 actions + 2 indices)
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +31,7 @@ class QuotesUnavailable(RuntimeError):
     """Aucune source de cours n'a répondu correctement."""
 
 
-def store_brvm_session(session_date, quotes) -> int:
+def store_brvm_session(session_date: date, quotes: pd.DataFrame) -> int:
     """Écrit les cours d'une séance lus sur brvm.org. Renvoie le nombre de lignes écrites."""
     if quotes is None or quotes.empty:
         raise ValueError("aucun cours BRVM à enregistrer")
@@ -33,9 +41,9 @@ def store_brvm_session(session_date, quotes) -> int:
     return len(rows)
 
 
-def refresh(progress=None) -> dict:
+def refresh(progress: Progress | None = None) -> dict[str, Any]:
     """Rafraîchit les cours. Sika Finance, puis brvm.org si Sika est insuffisant."""
-    sika_report: dict = {"ok": 0, "errors": ["non tenté"]}
+    sika_report: dict[str, Any] = {"ok": 0, "errors": ["non tenté"]}
     try:
         sika_report = sika.refresh_quotes(progress=progress)
     except requests.RequestException as e:
@@ -52,5 +60,4 @@ def refresh(progress=None) -> dict:
     n = store_brvm_session(session_date, quotes)
     db.mark_update("quotes")
     db.set_setting("quotes_source", "brvm.org")
-    return {"source": "brvm.org", "ok": n, "date": session_date.isoformat(),
-            "errors": sika_report["errors"][:3]}
+    return {"source": "brvm.org", "ok": n, "date": session_date.isoformat(), "errors": sika_report["errors"][:3]}

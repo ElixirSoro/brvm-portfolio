@@ -1,4 +1,5 @@
 """Configuration générale : chemins, paramètres par défaut, variables d'environnement."""
+
 from __future__ import annotations
 
 import os
@@ -33,13 +34,13 @@ NEWS_REFRESH_MINUTES = int(os.getenv("NEWS_REFRESH_MINUTES", "60"))
 
 # Frais par défaut (réglables dans l'interface, enregistrés en base)
 DEFAULT_FEES = {
-    "courtage_pct": 1.00,        # % du montant brut, SGI
-    "courtage_min": 2000.0,      # FCFA par ordre
+    "courtage_pct": 1.00,  # % du montant brut, SGI
+    "courtage_min": 2000.0,  # FCFA par ordre
     "brvm_pct": 0.15,
     "dcbr_pct": 0.10,
     "amf_pct": 0.10,
-    "tva_courtage_pct": 18.0,    # TVA sur le courtage (Côte d'Ivoire)
-    "garde_annuel_pct": 0.20,    # droits de garde annuels sur la valeur du portefeuille
+    "tva_courtage_pct": 18.0,  # TVA sur le courtage (Côte d'Ivoire)
+    "garde_annuel_pct": 0.20,  # droits de garde annuels sur la valeur du portefeuille
 }
 
 # IRVM sur dividendes, personnes physiques, par pays de l'émetteur (à vérifier chaque année)
@@ -50,10 +51,10 @@ DEFAULT_OPTIM = {
     "max_weight": 0.15,
     "max_sector": 0.40,
     "min_weight": 0.02,
-    "bond_return": 0.06,     # rendement des obligations d'État UEMOA
+    "bond_return": 0.06,  # rendement des obligations d'État UEMOA
     "bond_vol": 0.02,
     "history_years": 5,
     "min_daily_value": 1_000_000,  # FCFA échangés en moyenne par jour (filtre de liquidité)
-    "shrinkage": 0.75,       # poids donné au rendement de long terme face à l'historique récent
-    "price_prior": 0.05,     # rendement de cours annuel de long terme supposé (hors dividendes)
+    "shrinkage": 0.75,  # poids donné au rendement de long terme face à l'historique récent
+    "price_prior": 0.05,  # rendement de cours annuel de long terme supposé (hors dividendes)
 }

@@ -8,9 +8,12 @@ Types d'opération :
   FRAIS                 droits de garde, tenue de compte, autres
 Les quantités et cours antérieurs à un fractionnement sont convertis en actions actuelles.
 """
+
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace
 from datetime import date
+from typing import Any, IO
 
 import numpy as np
 import pandas as pd
@@ -20,58 +23,101 @@ from . import config, db, fees as fees_mod, market
 TYPES = ["DEPOT", "RETRAIT", "ACHAT", "VENTE", "DIVIDENDE", "COUPON", "FRAIS"]
 CASH_SIGN = {"DEPOT": 1, "RETRAIT": -1, "ACHAT": -1, "VENTE": 1, "DIVIDENDE": 1, "COUPON": 1, "FRAIS": -1}
 BOND_PREFIX = "OBLIG"
+DEFAULT_IRVM_PCT = 12.0
+MAX_CSV_ROWS = 10_000
+QTY_EPS = 1e-9
 
 
 # ---------- portefeuilles ----------
 def create(name: str, note: str = "") -> int:
+    """Crée un portefeuille vide ; renvoie son identifiant."""
+    if not name.strip():
+        raise ValueError("nom de portefeuille vide")
     return db.execute("INSERT INTO portfolios (name, note) VALUES (?, ?)", (name, note))
 
 
 def list_all() -> pd.DataFrame:
+    """Portefeuilles virtuels enregistrés."""
     return db.df("SELECT * FROM portfolios ORDER BY id")
 
 
 def delete(pid: int) -> None:
+    """Supprime un portefeuille et toutes ses opérations."""
     db.execute("DELETE FROM transactions WHERE portfolio_id=?", (pid,))
     db.execute("DELETE FROM portfolios WHERE id=?", (pid,))
 
 
 # ---------- opérations ----------
-def add(pid: int, day: str, kind: str, ticker: str | None = None, quantity: float = 0, price: float = 0,
-        amount: float | None = None, fees: float | None = None, note: str = "", dividend_is_gross: bool = False) -> int:
-    kind = kind.upper()
-    if kind not in TYPES:
-        raise ValueError(f"Type inconnu : {kind}")
-    ticker = (ticker or "").upper() or None
-    gross = float(amount if amount is not None else quantity * price)
-    if kind in ("ACHAT", "VENTE"):
-        if not ticker or quantity <= 0 or price <= 0:
+@dataclass(frozen=True)
+class Operation:
+    """Une ligne d'avis d'opéré ou de relevé SGI."""
+
+    day: str
+    kind: str
+    ticker: str | None = None
+    quantity: float = 0.0
+    price: float = 0.0
+    amount: float | None = None  # montant saisi (dépôt, dividende, frais…) ; sinon quantité x cours
+    fees: float | None = None  # None = frais calculés selon la grille
+    note: str = ""
+    dividend_is_gross: bool = False
+
+
+def _dividend_tax(op: Operation, gross: float) -> float:
+    """IRVM retenu à la source sur un dividende saisi en brut (0 si saisi en net)."""
+    if not (op.dividend_is_gross and op.ticker):
+        return 0.0
+    country = market.securities()["country"].get(op.ticker, "ci")
+    rate = float(db.get_setting("irvm", config.DEFAULT_IRVM).get(country, DEFAULT_IRVM_PCT)) / 100
+    return gross * rate  # IRVM retenu à la source
+
+
+def amounts(op: Operation) -> tuple[float, float, float]:
+    """(brut, frais ou IRVM, net) d'une opération ; ValueError si elle est incohérente."""
+    if op.kind not in TYPES:
+        raise ValueError(f"Type inconnu : {op.kind}")
+    if op.quantity < 0 or op.price < 0 or (op.amount is not None and op.amount < 0) or (op.fees or 0) < 0:
+        raise ValueError("quantité, cours, montant et frais doivent être positifs")
+    if op.kind in ("ACHAT", "VENTE"):
+        if not op.ticker or op.quantity <= 0 or op.price <= 0:
             raise ValueError("Achat/vente : ticker, quantité et cours sont obligatoires.")
-        gross = quantity * price
+        gross = op.quantity * op.price
+        fees = op.fees
         if fees is None:
-            fees = 0.0 if ticker.startswith(BOND_PREFIX) else fees_mod.order_fees(gross).total
-        net = gross + fees if kind == "ACHAT" else gross - fees
-    elif kind == "DIVIDENDE":
-        fees = 0.0
-        if dividend_is_gross and ticker:
-            country = market.securities()["country"].get(ticker, "ci")
-            rate = db.get_setting("irvm", config.DEFAULT_IRVM).get(country, 12.0) / 100
-            fees = gross * rate          # IRVM retenu à la source
-        net = gross - fees
-    else:
-        fees = fees or 0.0
-        net = gross
+            fees = 0.0 if op.ticker.startswith(BOND_PREFIX) else fees_mod.order_fees(gross).total
+        return gross, fees, gross + fees if op.kind == "ACHAT" else gross - fees
+    gross = float(op.amount if op.amount is not None else op.quantity * op.price)
+    if op.kind == "DIVIDENDE":
+        tax = _dividend_tax(op, gross)
+        return gross, tax, gross - tax
+    return gross, op.fees or 0.0, gross
+
+
+def add(pid: int, op: Operation) -> int:
+    """Enregistre une opération dans le portefeuille `pid` ; renvoie son identifiant."""
+    if pid <= 0:
+        raise ValueError(f"portefeuille invalide : {pid}")
+    op = replace(op, kind=op.kind.upper(), ticker=(op.ticker or "").upper() or None)
+    gross, fees, net = amounts(op)
+    if op.kind == "VENTE":
+        pos, _ = positions(pid, at=pd.Timestamp(op.day))
+        held = float(pos.loc[pos["ticker"] == op.ticker, "quantity"].sum())
+        if op.quantity > held + QTY_EPS:
+            raise ValueError(f"Vente de {op.quantity:g} {op.ticker} : seulement {held:g} titres détenus à cette date.")
     return db.execute(
         "INSERT INTO transactions (portfolio_id, date, type, ticker, quantity, price, gross, fees, net, note) "
         "VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (pid, day, kind, ticker, quantity, price, gross, fees, net, note))
+        (pid, op.day, op.kind, op.ticker, op.quantity, op.price, gross, fees, net, op.note),
+    )
 
 
 def remove(tx_id: int) -> None:
+    """Supprime une opération."""
     db.execute("DELETE FROM transactions WHERE id=?", (tx_id,))
 
 
 def transactions(pid: int) -> pd.DataFrame:
+    """Opérations d'un portefeuille, avec quantités et cours convertis en actions actuelles (fractionnements)."""
     tx = db.df("SELECT * FROM transactions WHERE portfolio_id=? ORDER BY date, id", (pid,))
     if tx.empty:
         return tx
@@ -86,98 +132,154 @@ def transactions(pid: int) -> pd.DataFrame:
     return tx
 
 
-def import_csv(pid: int, csv_file) -> int:
+def _opt_float(value: object) -> float | None:
+    """Nombre lu dans une cellule CSV ; None si la cellule est vide."""
+    return None if str(value).strip() == "" else float(str(value))
+
+
+def import_csv(pid: int, csv_file: str | IO[Any]) -> int:
     """CSV attendu : date,type,ticker,quantite,cours,montant,frais,note (colonnes vides permises)."""
     d = pd.read_csv(csv_file).fillna("")
-    n = 0
+    missing = {"date", "type"} - set(d.columns)
+    if missing:
+        raise ValueError(f"colonnes manquantes : {', '.join(sorted(missing))}")
+    if len(d) > MAX_CSV_ROWS:
+        raise ValueError(f"{len(d)} lignes, au-delà de {MAX_CSV_ROWS}")
     for _, r in d.iterrows():
-        add(pid, str(r["date"])[:10], str(r["type"]), str(r.get("ticker", "")) or None,
-            float(r.get("quantite") or 0), float(r.get("cours") or 0),
-            float(r["montant"]) if str(r.get("montant", "")) != "" else None,
-            float(r["frais"]) if str(r.get("frais", "")) != "" else None, str(r.get("note", "")))
-        n += 1
-    return n
+        add(
+            pid,
+            Operation(
+                str(r["date"])[:10],
+                str(r["type"]),
+                str(r.get("ticker", "")) or None,
+                _opt_float(r.get("quantite", "")) or 0.0,
+                _opt_float(r.get("cours", "")) or 0.0,
+                _opt_float(r.get("montant", "")),
+                _opt_float(r.get("frais", "")),
+                str(r.get("note", "")),
+            ),
+        )
+    return len(d)
 
 
 # ---------- positions et valorisation ----------
-def positions(pid: int, at: pd.Timestamp | None = None, tx: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict]:
-    tx = transactions(pid) if tx is None else tx
-    empty = pd.DataFrame(columns=["ticker", "quantity", "avg_cost", "cost", "realized"])
-    if tx.empty:
-        return empty, {"cash": 0.0, "deposits": 0.0, "withdrawals": 0.0, "fees": 0.0, "dividends": 0.0,
-                       "realized": 0.0, "irvm": 0.0}
-    if at is not None:
-        tx = tx[tx["date"] <= at]
-    book: dict[str, dict] = {}
-    cash = deposits = withdrawals = fees_paid = dividends = realized = irvm = 0.0
-    for _, t in tx.iterrows():
+ACCOUNTS = ("cash", "deposits", "withdrawals", "fees", "dividends", "realized", "irvm")
+POSITION_COLUMNS = ["ticker", "quantity", "avg_cost", "cost", "realized"]
+
+
+@dataclass
+class _Ledger:
+    """Livre de comptes construit opération par opération (état propre, jamais partagé)."""
+
+    acc: dict[str, float] = field(default_factory=lambda: dict.fromkeys(ACCOUNTS, 0.0))
+    book: dict[str, dict[str, float]] = field(default_factory=dict)
+
+    def apply(self, t: pd.Series) -> None:
+        """Applique une opération (ligne de `transactions`) aux comptes et aux positions."""
         k = t["type"]
-        cash += CASH_SIGN[k] * t["net"]
-        if k == "DEPOT":
-            deposits += t["net"]
-        elif k == "RETRAIT":
-            withdrawals += t["net"]
-        elif k == "FRAIS":
-            fees_paid += t["net"]
-        elif k in ("DIVIDENDE", "COUPON"):
-            dividends += t["net"]
-            irvm += t["fees"] or 0
-        elif k == "ACHAT":
-            fees_paid += t["fees"]
-            b = book.setdefault(t["ticker"], {"quantity": 0.0, "cost": 0.0, "realized": 0.0})
+        if k not in CASH_SIGN:
+            raise ValueError(f"type d'opération inconnu en base : {k}")
+        self.acc["cash"] += CASH_SIGN[k] * t["net"]
+        if k in ("DEPOT", "RETRAIT", "FRAIS"):
+            self.acc[{"DEPOT": "deposits", "RETRAIT": "withdrawals", "FRAIS": "fees"}[k]] += t["net"]
+            return
+        if k in ("DIVIDENDE", "COUPON"):
+            self.acc["dividends"] += t["net"]
+            self.acc["irvm"] += t["fees"] or 0
+            return
+        self.acc["fees"] += t["fees"]
+        b = self.book.setdefault(t["ticker"], {"quantity": 0.0, "cost": 0.0, "realized": 0.0})
+        if k == "ACHAT":
             b["quantity"] += t["adj_qty"]
             b["cost"] += t["net"]
-        elif k == "VENTE":
-            fees_paid += t["fees"]
-            b = book.setdefault(t["ticker"], {"quantity": 0.0, "cost": 0.0, "realized": 0.0})
-            avg = b["cost"] / b["quantity"] if b["quantity"] else 0.0
-            sold_cost = avg * t["adj_qty"]
-            b["realized"] += t["net"] - sold_cost
-            realized += t["net"] - sold_cost
-            b["quantity"] -= t["adj_qty"]
-            b["cost"] -= sold_cost
-    rows = [{"ticker": tk, "quantity": b["quantity"], "cost": b["cost"],
-             "avg_cost": b["cost"] / b["quantity"] if b["quantity"] > 1e-9 else 0.0, "realized": b["realized"]}
-            for tk, b in book.items() if abs(b["quantity"]) > 1e-9]
-    pos = pd.DataFrame(rows) if rows else empty
-    return pos, {"cash": cash, "deposits": deposits, "withdrawals": withdrawals, "fees": fees_paid,
-                 "dividends": dividends, "realized": realized, "irvm": irvm}
+            return
+        sold_cost = (b["cost"] / b["quantity"] if b["quantity"] else 0.0) * t["adj_qty"]
+        b["realized"] += t["net"] - sold_cost
+        self.acc["realized"] += t["net"] - sold_cost
+        b["quantity"] -= t["adj_qty"]
+        b["cost"] -= sold_cost
 
 
-def valuation(pid: int) -> tuple[pd.DataFrame, dict]:
+def positions(pid: int, at: pd.Timestamp | None = None, tx: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Positions détenues et comptes (liquidités, versements, frais, dividendes…) à la date `at`."""
+    tx = transactions(pid) if tx is None else tx
+    ledger = _Ledger()
+    if tx.empty:
+        return pd.DataFrame(columns=POSITION_COLUMNS), ledger.acc
+    if at is not None:
+        tx = tx[tx["date"] <= at]
+    for _, t in tx.iterrows():
+        ledger.apply(t)
+    acc, book = ledger.acc, ledger.book
+    rows = [
+        {
+            "ticker": tk,
+            "quantity": b["quantity"],
+            "cost": b["cost"],
+            "avg_cost": b["cost"] / b["quantity"] if b["quantity"] > QTY_EPS else 0.0,
+            "realized": b["realized"],
+        }
+        for tk, b in book.items()
+        if abs(b["quantity"]) > QTY_EPS
+    ]
+    pos = pd.DataFrame(rows) if rows else pd.DataFrame(columns=POSITION_COLUMNS)
+    assert pos.empty or bool((pos["quantity"] > 0).all()), "position négative : vente de plus de titres que détenus"
+    return pos, acc
+
+
+def valuation(pid: int) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Positions valorisées au dernier cours et synthèse (valeur, plus-value, frais de sortie, valeur liquidative)."""
     pos, acc = positions(pid)
     quotes = market.latest_quotes()
     secs = market.securities()
     if not pos.empty:
-        def price_of(t):
+
+        def price_of(t: str) -> float:
+            """Cours de valorisation : dernier cours, ou prix de revient pour les obligations."""
             if t.startswith(BOND_PREFIX):
                 return float(pos.loc[pos["ticker"] == t, "avg_cost"].iloc[0])  # obligations au prix de revient
             return float(quotes["last"].get(t, np.nan)) if not quotes.empty else np.nan
-        pos["name"] = pos["ticker"].map(lambda t: secs["name"].get(t, "Obligations") if not t.startswith(BOND_PREFIX) else "Obligations")
-        pos["sector"] = pos["ticker"].map(lambda t: secs["sector"].get(t, "Obligations") if not t.startswith(BOND_PREFIX) else "Obligations")
+
+        pos["name"] = pos["ticker"].map(
+            lambda t: secs["name"].get(t, "Obligations") if not t.startswith(BOND_PREFIX) else "Obligations"
+        )
+        pos["sector"] = pos["ticker"].map(
+            lambda t: secs["sector"].get(t, "Obligations") if not t.startswith(BOND_PREFIX) else "Obligations"
+        )
         pos["price"] = pos["ticker"].map(price_of)
         pos["value"] = pos["quantity"] * pos["price"]
         pos["gain"] = pos["value"] - pos["cost"]
         pos["gain_pct"] = pos["gain"] / pos["cost"]
         pos["change_day"] = pos["ticker"].map(lambda t: quotes["change_day"].get(t, np.nan) if not quotes.empty else np.nan)
         # frais de sortie estimés si l'on vendait tout aujourd'hui
-        pos["exit_fees"] = pos.apply(lambda r: 0.0 if r["ticker"].startswith(BOND_PREFIX)
-                                     else fees_mod.order_fees(r["value"]).total if r["value"] > 0 else 0.0, axis=1)
+        pos["exit_fees"] = pos.apply(
+            lambda r: (
+                0.0 if r["ticker"].startswith(BOND_PREFIX) else fees_mod.order_fees(r["value"]).total if r["value"] > 0 else 0.0
+            ),
+            axis=1,
+        )
         total_value = pos["value"].sum()
         pos["weight"] = pos["value"] / (total_value + max(acc["cash"], 0))
     else:
         total_value = 0.0
     net_invested = acc["deposits"] - acc["withdrawals"]
     total = total_value + acc["cash"]
-    summary = {**acc, "securities_value": total_value, "total": total, "net_invested": net_invested,
-               "gain": total - net_invested, "gain_pct": (total / net_invested - 1) if net_invested else np.nan,
-               "exit_fees": float(pos["exit_fees"].sum()) if not pos.empty else 0.0,
-               "custody_accrued": custody_accrued(pid, total_value)}
+    summary = {
+        **acc,
+        "securities_value": total_value,
+        "total": total,
+        "net_invested": net_invested,
+        "gain": total - net_invested,
+        "gain_pct": (total / net_invested - 1) if net_invested else np.nan,
+        "exit_fees": float(pos["exit_fees"].sum()) if not pos.empty else 0.0,
+        "custody_accrued": custody_accrued(pid, total_value),
+    }
     summary["liquidation_value"] = total - summary["exit_fees"] - summary["custody_accrued"]
     return pos, summary
 
 
 def custody_accrued(pid: int, value: float) -> float:
+    """Droits de garde courus depuis le dernier prélèvement saisi (ou depuis la première opération)."""
     tx = transactions(pid)
     if tx.empty:
         return 0.0
@@ -195,7 +297,7 @@ def history(pid: int) -> pd.DataFrame:
     start = tx["date"].min()
     years = (pd.Timestamp(date.today()) - start).days / 365.25 + 0.1
     tickers = [t for t in tx["ticker"].dropna().unique() if not t.startswith(BOND_PREFIX)]
-    panel = market.close_panel(years=years, tickers=tickers + ["BRVMC"])
+    panel = market.close_panel(years=years, tickers=[*tickers, "BRVMC"])
     days = pd.bdate_range(start, pd.Timestamp(date.today()))
     panel = panel.reindex(days).ffill() if not panel.empty else pd.DataFrame(index=days)
     flows = tx[tx["type"].isin(["DEPOT", "RETRAIT"])].copy()
@@ -241,14 +343,24 @@ def dividend_suggestions(pid: int) -> pd.DataFrame:
         held = pos.loc[pos["ticker"] == d["ticker"], "quantity"]
         if held.empty or held.iloc[0] <= 0:
             continue
-        already = recorded[(recorded["ticker"] == d["ticker"]) &
-                           (recorded["date"] >= ex - pd.Timedelta(days=5)) &
-                           (recorded["date"] <= pd.Timestamp(d["pay_date"]) + pd.Timedelta(days=30))]
+        already = recorded[
+            (recorded["ticker"] == d["ticker"])
+            & (recorded["date"] >= ex - pd.Timedelta(days=5))
+            & (recorded["date"] <= pd.Timestamp(d["pay_date"]) + pd.Timedelta(days=30))
+        ]
         if not already.empty:
             continue
         q = held.iloc[0]
-        rows.append({"ticker": d["ticker"], "ex_date": d["ex_date"], "pay_date": d["pay_date"], "quantity": q,
-                     "net_per_share": d["net"], "net_total": q * d["net"]})
+        rows.append(
+            {
+                "ticker": d["ticker"],
+                "ex_date": d["ex_date"],
+                "pay_date": d["pay_date"],
+                "quantity": q,
+                "net_per_share": d["net"],
+                "net_total": q * d["net"],
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -256,8 +368,20 @@ def mirror_from_orders(name: str, orders: pd.DataFrame, day: str, deposit: float
     """Crée un portefeuille virtuel à partir des ordres proposés par l'optimiseur."""
     pid = create(name, "Créé depuis l'optimiseur")
     total = float(orders["total"].sum())
-    add(pid, day, "DEPOT", amount=deposit or total, note="Dépôt initial")
+    if orders.empty:
+        raise ValueError("aucun ordre à copier")
+    add(pid, Operation(day, "DEPOT", amount=deposit or total, note="Dépôt initial"))
     for _, o in orders.iterrows():
-        add(pid, day, "ACHAT", o["ticker"], o["quantity"], o["price"],
-            fees=o["fees"], note="Ordre proposé par l'optimiseur")
+        add(
+            pid,
+            Operation(
+                day,
+                "ACHAT",
+                o["ticker"],
+                float(o["quantity"]),
+                float(o["price"]),
+                fees=float(o["fees"]),
+                note="Ordre proposé par l'optimiseur",
+            ),
+        )
     return pid

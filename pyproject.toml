@@ -1,0 +1,24 @@
+[project]
+name = "brvm-portfolio"
+version = "0.2.0"
+description = "Portefeuille BRVM selon l'aversion au risque, simulations, portefeuille virtuel, veille et documents officiels"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "C4", "SIM", "PLE", "PLW", "RUF", "BLE"]
+ignore = ["RUF001", "RUF002", "RUF003"]   # caractères typographiques français (’, « », espaces fines) voulus
+
+[tool.mypy]
+files = ["brvm", "views", "app.py"]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

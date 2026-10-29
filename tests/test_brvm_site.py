@@ -1,4 +1,5 @@
 """Tests du secours brvm.org, sur un extrait réel de la page du 28/10/2026."""
+
 from datetime import date
 
 import pytest
@@ -6,16 +7,25 @@ import pytest
 from brvm import db
 from brvm.data import brvm_site, quotes
 
-ROW = ('<tr><td>{t}</td><td>NOM {t}</td><td class="text-right">1 667</td><td class="text-right">3 290</td>'
-       '<td class="text-right">3 200</td><td class="text-right">{c}</td><td class="text-right">'
-       '<span class="text-good">{v}</span></td> </tr>')
-HEAD = ('<thead><tr><th>Symbole</th><th>Nom</th><th class="text-right">Volume</th><th class="text-right">Cours veille (FCFA)</th>'
-        '<th class="text-right">Cours Ouverture (FCFA)</th><th class="text-right">Cours Clôture (FCFA)</th>'
-        '<th class="text-right">Variation (%)</th> </tr></thead>')
-SNTS = ('<tr><td>SNTS</td><td>SONATEL SENEGAL</td><td class="text-right">3 123 435</td><td class="text-right">4 250</td>'
-        '<td class="text-right">4 425</td><td class="text-right">4 200</td><td class="text-right">'
-        '<span class="text-bad">-5,08</span></td> </tr>')
-INDEX = '<table><tr><td>BRVM-C</td><td class="text-right">528,34</td><td class="text-right">-0,70% <span></span></td><td></td> </tr></table>'
+ROW = (
+    '<tr><td>{t}</td><td>NOM {t}</td><td class="text-right">1 667</td><td class="text-right">3 290</td>'
+    '<td class="text-right">3 200</td><td class="text-right">{c}</td><td class="text-right">'
+    '<span class="text-good">{v}</span></td> </tr>'
+)
+HEAD = (
+    '<thead><tr><th>Symbole</th><th>Nom</th><th class="text-right">Volume</th><th class="text-right">Cours veille (FCFA)</th>'
+    '<th class="text-right">Cours Ouverture (FCFA)</th><th class="text-right">Cours Clôture (FCFA)</th>'
+    '<th class="text-right">Variation (%)</th> </tr></thead>'
+)
+SNTS = (
+    '<tr><td>SNTS</td><td>SONATEL SENEGAL</td><td class="text-right">3 123 435</td><td class="text-right">4 250</td>'
+    '<td class="text-right">4 425</td><td class="text-right">4 200</td><td class="text-right">'
+    '<span class="text-bad">-5,08</span></td> </tr>'
+)
+INDEX = (
+    '<table><tr><td>BRVM-C</td><td class="text-right">528,34</td>'
+    '<td class="text-right">-0,70% <span></span></td><td></td> </tr></table>'
+)
 DATE = '<section id="block-tools-date-maj">\n  Dernière mise à jour : Mercredi, 28 octobre, 2026 - 22:45\n</section>'
 
 
@@ -68,6 +78,7 @@ def test_both_sources_down(monkeypatch):
 
     def boom():
         raise brvm_site.BrvmParseError("structure changée")
+
     monkeypatch.setattr(quotes.brvm_site, "fetch_quotes", boom)
     with pytest.raises(quotes.QuotesUnavailable):
         quotes.refresh()
