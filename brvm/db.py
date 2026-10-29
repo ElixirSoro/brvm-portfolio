@@ -37,6 +37,7 @@ DB_ERRORS: tuple[type[Exception], ...] = (sqlite3.Error, psycopg.Error)
 SAVE_ERRORS: tuple[type[Exception], ...] = (ValueError, *DB_ERRORS)  # saisie refusée ou écriture impossible
 POOL_MAX = 6
 POOL_TIMEOUT_S = 30
+CONNECT_TIMEOUT_S = 10
 SQLITE_TIMEOUT_S = 30
 
 
@@ -175,6 +176,11 @@ def _params(params: Sequence[Any]) -> tuple[Any, ...]:
 
 
 # ---------------------------------------------------------------- connexions
+def redact(text: str) -> str:
+    """Texte (message d'erreur, URL) dont les mots de passe de connexion sont masqués."""
+    return re.sub(r"(postgres(?:ql)?://[^:/@\s]+:)[^@\s]+@", r"\1•••@", text)
+
+
 def database_url() -> str:
     """Chaîne de connexion PostgreSQL (variable DATABASE_URL), vide en mode local SQLite."""
     return os.getenv("DATABASE_URL", "").strip()
@@ -185,6 +191,10 @@ def _pool(url: str) -> ConnectionPool[Any]:
     """Pool de connexions PostgreSQL, créé une seule fois par processus et par URL."""
     if not url.startswith(("postgresql://", "postgres://")):
         raise ValueError("DATABASE_URL doit commencer par postgresql://")
+    # essai unique et rapide : un mauvais mot de passe échoue ici avec un message clair,
+    # au lieu de laisser le pool réessayer indéfiniment en arrière-plan
+    with psycopg.connect(url, connect_timeout=CONNECT_TIMEOUT_S) as probe:
+        probe.execute("SELECT 1")
     # prepare_threshold=None : compatible avec le pooler de Supabase (mode transaction)
     pool: ConnectionPool[Any] = ConnectionPool(
         url, min_size=1, max_size=POOL_MAX, timeout=POOL_TIMEOUT_S, open=True,

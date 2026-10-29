@@ -269,3 +269,9 @@ def test_postgres_translation():
     with pytest.raises(ValueError):
         db.to_postgres("  ")
     assert db._params((np.float64("nan"), np.int64(3), True)) == (None, 3, 1)
+
+
+def test_redact_hides_password():
+    url = "postgresql://postgres.abc:S3cret!x@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+    assert "S3cret" not in db.redact(f"échec : {url}")
+    assert db.redact(url).startswith("postgresql://postgres.abc:•••@aws-0")

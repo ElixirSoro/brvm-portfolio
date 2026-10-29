@@ -71,8 +71,18 @@ pio.templates.default = "elixir"
 # DÉROGATION règle 10 : st.cache_resource n'est pas annoté par Streamlit (mypy --strict le signale).
 @st.cache_resource  # type: ignore[untyped-decorator]
 def _init_db() -> bool:
-    """Initialise la base une seule fois par serveur et charge les dividendes si la table est vide."""
-    db.init()
+    """Initialise la base une seule fois par serveur et charge les dividendes si la table est vide.
+
+    En cas d'échec de connexion, affiche la cause (mot de passe masqué) et arrête la page.
+    """
+    try:
+        db.init()
+    except db.DB_ERRORS as e:
+        st.error(
+            f"Connexion à la base {db.engine()} impossible : {db.redact(str(e)).splitlines()[0]}\n\n"
+            "Vérifie la ligne DATABASE_URL dans les Secrets de l'application (mot de passe Supabase)."
+        )
+        st.stop()
     from .data import loader
 
     if db.df("SELECT 1 FROM dividends LIMIT 1").empty:
