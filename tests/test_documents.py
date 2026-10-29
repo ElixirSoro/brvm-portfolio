@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
@@ -275,3 +276,13 @@ def test_redact_hides_password():
     url = "postgresql://postgres.abc:S3cret!x@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
     assert "S3cret" not in db.redact(f"échec : {url}")
     assert db.redact(url).startswith("postgresql://postgres.abc:•••@aws-0")
+
+
+def test_event_without_ticker_is_stored(tmp_path, monkeypatch):
+    pdf = make_pdf(tmp_path / "boc.pdf", BOC_PAGES)
+    pages = boc.pdf_lines(pdf)
+    day = boc.parse_session_date(pages[0][0])
+    events = pd.DataFrame([{"date": "2026-10-28", "ticker": None, "kind": "communique", "title": "Avis du marché"}])
+    documents.store_boc(day, boc.parse_equities(pages), boc.parse_market(pages[0]), events, "https://www.brvm.org/x.pdf")
+    got = db.df("SELECT ticker FROM events WHERE title='Avis du marché'")
+    assert got["ticker"].tolist() == [""]

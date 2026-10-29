@@ -28,6 +28,7 @@ from .data import boc, reports
 LIST_PAGES_MAX = 3
 MAX_BOC_BATCH = 60
 MAX_PDF_TEXT_PAGES = 150
+UNKNOWN_PERIOD = "inconnue"
 
 Progress = Callable[[float, str], None]
 
@@ -98,7 +99,10 @@ def store_boc(session_date: date, equities: pd.DataFrame, market: dict[str, Any]
     db.execute("INSERT OR REPLACE INTO prices (ticker, date, close) VALUES ('BRVMC', ?, ?)", (day, market["composite"]))
     db.executemany(
         "INSERT OR IGNORE INTO events VALUES (?,?,?,?,?)",
-        [(e["date"], e["ticker"], e["kind"], e["title"], "BOC " + day) for _, e in events.iterrows()],
+        [
+            (e["date"], "" if pd.isna(e["ticker"]) else e["ticker"], e["kind"], e["title"], "BOC " + day)
+            for _, e in events.iterrows()
+        ],
     )
 
 
@@ -230,7 +234,7 @@ def analyze_report(url: str, use_ai: bool = True) -> dict[str, Any]:
         raise fin.ExtractionError("PDF scanné : ajoute une clé API Claude dans .env pour le lire")
     else:
         figures = fin.extract_rules(pages)
-    period = rep["period"] or meta.get("period") or rep["published"]
+    period = rep["period"] or meta.get("period") or rep["published"] or UNKNOWN_PERIOD
     method = "IA" if client is not None else "règles"
     db.executemany(
         "INSERT OR REPLACE INTO financials VALUES (?,?,?,?,?,?,?,?)",

@@ -111,7 +111,8 @@ def ddl(engine: str) -> list[str]:
         raise ValueError(f"moteur inconnu : {engine}")
     out = []
     for name, t in TABLES.items():
-        cols = [f"{c} {TYPES[engine][typ]}" for c, typ in t.columns]
+        # colonnes de clé NOT NULL dans les deux moteurs (PostgreSQL l'impose ; SQLite le tolérerait)
+        cols = [f"{c} {TYPES[engine][typ]}" + (" NOT NULL" if c in t.key and typ != "id" else "") for c, typ in t.columns]
         if t.key != ("id",):
             cols.append(f"PRIMARY KEY ({', '.join(t.key)})")
         cols += [f"UNIQUE ({u})" for u in t.unique]
