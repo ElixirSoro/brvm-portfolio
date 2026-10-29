@@ -11,7 +11,8 @@ from brvm import config, db, fees, ui
 from brvm.bots import sources
 from brvm.data import loader, sika
 
-ui.setup("Réglages", "Données, frais et sources", "Tout ce qui est enregistré ici reste sur ton ordinateur, dans data/brvm.db.")
+WHERE = "dans ta base Supabase (en ligne, privée)" if db.engine() == "postgres" else "sur ton ordinateur, dans data/brvm.db"
+ui.setup("Réglages", "Données, frais et sources", f"Tout ce qui est enregistré ici reste {WHERE}.")
 
 # ---------------- données ----------------
 ui.section("Données", "Cours de bourse")
