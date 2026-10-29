@@ -83,6 +83,11 @@ tests/                  98 tests (données synthétiques, extraits réels de BOC
 
 ## Version en ligne
 
+**Comptes** : en ligne, chaque personne crée un compte (e-mail et mot de passe, Supabase Auth) et ne voit que
+ses propres portefeuilles, opérations et grille de frais ; les cours, documents officiels et la veille sont
+communs. Seuls les administrateurs (`ADMIN_EMAILS`) peuvent mettre à jour ces données communes. En local
+(base SQLite), il n'y a pas de compte.
+
 L'application tourne aussi sur Streamlit Community Cloud (accès privé, sur invitation), branchée sur
 une base PostgreSQL Supabase (projet `brvm-portfolio`, us-east-1).
 

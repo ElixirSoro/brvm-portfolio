@@ -79,7 +79,7 @@ TABLES: dict[str, Table] = {
     "prices": Table(_cols("ticker text, date text, open real, high real, low real, close real, volume real"), ("ticker", "date")),
     "corporate_actions": Table(_cols("ticker text, date text, ratio real"), ("ticker", "date")),
     "dividends": Table(_cols("ticker text, ex_date text, pay_date text, amount real, is_gross int"), ("ticker", "ex_date")),
-    "portfolios": Table(_cols("id id, name text, created created, note text"), ("id",), ("name",)),
+    "portfolios": Table(_cols("id id, name text, created created, note text, owner text"), ("id",)),
     "transactions": Table(
         _cols("id id, portfolio_id int, date text, type text, ticker text, quantity real, price real, gross real, "
               "fees real, net real, note text"), ("id",)),
@@ -106,6 +106,15 @@ TABLES: dict[str, Table] = {
                               "confidence text, url text"), ("ticker", "period", "metric")),
 }  # fmt: skip
 INDEXES = ("CREATE INDEX IF NOT EXISTS idx_news_fp ON news(fingerprint)",)
+# évolutions de schéma des bases déjà créées (idempotentes) : portefeuilles rangés par propriétaire
+MIGRATIONS = {
+    "postgres": (
+        "ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS owner TEXT",
+        "ALTER TABLE portfolios DROP CONSTRAINT IF EXISTS portfolios_name_key",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolios_owner_name ON portfolios(owner, name)",
+    ),
+    "sqlite": ("CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolios_owner_name ON portfolios(owner, name)",),
+}
 
 
 def ddl(engine: str) -> list[str]:
@@ -266,10 +275,23 @@ def engine() -> str:
     return "postgres" if database_url() else "sqlite"
 
 
+def _sqlite_add_owner(con: Conn) -> None:
+    """Ajoute la colonne owner aux bases SQLite créées avant les comptes utilisateurs."""
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(portfolios)").fetchall()}
+    assert cols, "table portfolios absente"
+    if "owner" not in cols:
+        con.execute("ALTER TABLE portfolios ADD COLUMN owner TEXT")
+
+
 def init(path: Path | None = None) -> None:
     """Crée les tables manquantes et charge l'univers des 48 valeurs et les opérations sur titres."""
     with session(path) as con:
-        for stmt in ddl("postgres" if con.postgres else "sqlite"):
+        engine_name = "postgres" if con.postgres else "sqlite"
+        for stmt in ddl(engine_name):
+            con.execute(stmt)
+        if not con.postgres:
+            _sqlite_add_owner(con)
+        for stmt in MIGRATIONS[engine_name]:
             con.execute(stmt)
         con.executemany(
             "INSERT OR REPLACE INTO securities VALUES (?,?,?,?,?)",

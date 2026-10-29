@@ -7,12 +7,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from brvm import config, db, fees, ui
+from brvm import auth, config, db, fees, ui
 from brvm.bots import sources
 from brvm.data import loader, sika
 
 WHERE = "dans ta base Supabase (en ligne, privée)" if db.engine() == "postgres" else "sur ton ordinateur, dans data/brvm.db"
 ui.setup("Réglages", "Données, frais et sources", f"Tout ce qui est enregistré ici reste {WHERE}.")
+ui.locked_note()
 
 # ---------------- données ----------------
 ui.section("Données", "Cours de bourse")
@@ -27,7 +28,7 @@ c1, c2 = st.columns(2)
 with c1:
     st.markdown("**Importer l'historique de Cote_scrapper**")
     path = st.text_input("Dossier BRVM_DATA_SCRAP", str(config.SCRAP_DIR))
-    if st.button("Importer ce dossier", icon=":material/upload_file:"):
+    if st.button("Importer ce dossier", icon=":material/upload_file:", disabled=ui.locked()):
         with st.spinner("Import…"):
             r = loader.import_scrap_dir(Path(path).expanduser())
         st.cache_data.clear()
@@ -35,7 +36,7 @@ with c1:
 with c2:
     st.markdown("**Télécharger depuis Sika Finance**")
     years = st.slider("Années d'historique (premier téléchargement)", 1, 15, 10)
-    if st.button("Télécharger / compléter l'historique", icon=":material/cloud_download:"):
+    if st.button("Télécharger / compléter l'historique", icon=":material/cloud_download:", disabled=ui.locked()):
         bar = st.progress(0.0, "Téléchargement…")
         r = sika.update_history(years=years, progress=lambda p, t: bar.progress(p, f"{t}"))
         st.cache_data.clear()
@@ -67,7 +68,7 @@ st.markdown(
     f'<span class="elx-num">{ui.pct(2 * ex.rate, 2)}</span>.',
     unsafe_allow_html=True,
 )
-irvm = db.get_setting("irvm", config.DEFAULT_IRVM)
+irvm = auth.get_user_setting("irvm", config.DEFAULT_IRVM)
 st.markdown("**IRVM sur dividendes, par pays de l'émetteur (%)**")
 ir_cols = st.columns(8)
 new_irvm = {
@@ -75,8 +76,8 @@ new_irvm = {
     for i, c in enumerate(config.DEFAULT_IRVM)
 }
 if st.button("Enregistrer les frais", type="primary"):
-    db.set_setting("fees", new)
-    db.set_setting("irvm", new_irvm)
+    auth.set_user_setting("fees", new)
+    auth.set_user_setting("irvm", new_irvm)
     st.cache_data.clear()
     st.toast("Frais enregistrés.")
 
@@ -89,7 +90,7 @@ div = (
     else pd.DataFrame(columns=["ticker", "ex_date", "pay_date", "amount", "is_gross"])
 )
 edited = st.data_editor(div, num_rows="dynamic", width="stretch", height=300)
-if st.button("Enregistrer le calendrier"):
+if st.button("Enregistrer le calendrier", disabled=ui.locked()):
     edited.to_csv(loader.DIVIDENDS_CSV, index=False)
     db.execute("DELETE FROM dividends")
     loader.load_dividends()
@@ -112,6 +113,6 @@ st.markdown(
 )
 rss = sources.RSS_FILE.read_text(encoding="utf-8") if sources.RSS_FILE.exists() else sources.DEFAULT_RSS
 txt = st.text_area("Flux RSS supplémentaires (une URL par ligne)", rss, height=140)
-if st.button("Enregistrer les flux"):
+if st.button("Enregistrer les flux", disabled=ui.locked()):
     sources.RSS_FILE.write_text(txt, encoding="utf-8")
     st.toast("Flux enregistrés.")

@@ -15,6 +15,7 @@ ui.setup(
     "Les bots lisent l'actualité de la Côte d'Ivoire, de l'UEMOA, de l'Afrique et du monde, puis notent "
     "l'impact probable de chaque information sur les 48 valeurs. Un score n'est pas une recommandation.",
 )
+ui.locked_note()
 
 ai_on = bool(config.ANTHROPIC_API_KEY)
 st.markdown(
@@ -25,19 +26,19 @@ st.markdown(
 )
 
 b1, b2, b3 = st.columns(3)
-if b1.button("Collecter les actualités", icon=":material/travel_explore:", width="stretch"):
+if b1.button("Collecter les actualités", icon=":material/travel_explore:", width="stretch", disabled=ui.locked()):
     bar = st.progress(0.0, "Lecture des flux…")
     r = collector.collect(progress=lambda p, q: bar.progress(p, f"Flux : {q}"))
     st.toast(
         f"{r['new']} nouveaux articles sur {r['feeds']} flux" + (f" · {len(r['errors'])} flux en erreur" if r["errors"] else "")
     )
-if b2.button("Analyser les nouveaux articles", icon=":material/psychology:", width="stretch"):
+if b2.button("Analyser les nouveaux articles", icon=":material/psychology:", width="stretch", disabled=ui.locked()):
     bar = st.progress(0.0, "Analyse…")
     r = analyst.analyze_pending(progress=lambda p, _: bar.progress(p, "Analyse…"))
     st.toast(f"{r['analyzed']} articles analysés ({r['by_ai']} par l'IA)")
     if r["errors"]:
         st.warning("L'IA a renvoyé des erreurs, le score par mots-clés a pris le relais : " + r["errors"][0])
-if b3.button("Mettre à jour les indicateurs", icon=":material/show_chart:", width="stretch"):
+if b3.button("Mettre à jour les indicateurs", icon=":material/show_chart:", width="stretch", disabled=ui.locked()):
     with st.spinner("Pétrole, cacao, sucre, or, euro/dollar, taux US…"):
         r = collector.collect_market_factors()
     st.toast(f"{r['ok']} indicateurs à jour")

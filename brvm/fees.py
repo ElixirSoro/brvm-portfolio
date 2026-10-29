@@ -7,7 +7,7 @@ from typing import Any
 import math
 from dataclasses import dataclass
 
-from . import config, db
+from . import auth, config
 
 DAYS_PER_YEAR = 365
 FEE_KEYS = ("courtage_pct", "courtage_min", "tva_courtage_pct", "brvm_pct", "dcbr_pct", "amf_pct")
@@ -16,7 +16,7 @@ FEE_KEYS = ("courtage_pct", "courtage_min", "tva_courtage_pct", "brvm_pct", "dcb
 def current_fees() -> dict[str, Any]:
     """Grille de frais en vigueur : valeurs par défaut complétées par les réglages de l'utilisateur."""
     fees = dict(config.DEFAULT_FEES)
-    fees.update(db.get_setting("fees", {}) or {})
+    fees.update(auth.get_user_setting("fees", {}) or {})
     return fees
 
 
