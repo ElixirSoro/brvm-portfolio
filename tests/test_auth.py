@@ -90,3 +90,17 @@ def test_admin_flag_and_owner_validation():
     assert not auth.User("y", "autre@example.com").is_admin
     with pytest.raises(ValueError):
         auth.set_owner("")
+
+
+def test_other_account_cannot_read_value_or_edit_operations(as_owner):
+    as_owner("carla")
+    pid = portfolio.create("Épargne Carla")
+    tx_id = portfolio.add(pid, portfolio.Operation("2026-07-01", "DEPOT", amount=50_000))
+    as_owner("dan")
+    for attempt in (lambda: portfolio.remove(tx_id), lambda: portfolio.valuation(pid),
+                    lambda: portfolio.positions(pid), lambda: portfolio.history(pid),
+                    lambda: portfolio.dividend_suggestions(pid)):  # fmt: skip
+        with pytest.raises(PermissionError):
+            attempt()
+    as_owner("carla")
+    assert len(portfolio.transactions(pid)) == 1
