@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
 
@@ -10,13 +12,23 @@ from .. import db
 HALF_LIFE_DAYS = {"court": 7, "moyen": 30, "long": 90}
 
 
+MAX_DAYS = 3650
+
+
+def cutoff_iso(days: int) -> str:
+    """Date-heure UTC d'il y a `days` jours au format ISO, comparable aux dates `published` des articles."""
+    if not 0 < days <= MAX_DAYS:
+        raise ValueError(f"nombre de jours entre 1 et {MAX_DAYS} (reçu {days})")
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+
+
 def impacts(days: int = 60) -> pd.DataFrame:
     """Impacts d'actualité des `days` derniers jours, joints à leur article (titre, source, date, résumé)."""
     d = db.df(
         """SELECT i.*, n.title, n.url, n.source, n.published, n.summary, n.category, n.scope, n.method
                  FROM impacts i JOIN news n ON n.id = i.news_id
-                 WHERE n.published >= datetime('now', ?)""",
-        (f"-{days} days",),
+                 WHERE n.published >= ?""",
+        (cutoff_iso(days),),
     )
     if d.empty:
         return d

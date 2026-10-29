@@ -2,7 +2,6 @@
 
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # la logique est dans le paquet brvm, la page ne fait qu'afficher.
-import sqlite3
 from datetime import date
 from typing import Any
 
@@ -11,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from brvm import market, optimizer, portfolio, risk_profile, ui
+from brvm import db, market, optimizer, portfolio, risk_profile, ui
 from brvm.bots import signals
 
 ui.setup(
@@ -192,7 +191,7 @@ with b1:
         try:
             pid = portfolio.mirror_from_orders(pname, orders, date.today().isoformat(), deposit=capital)
             st.success(f"Portefeuille « {pname} » créé : retrouve-le dans **Mon portefeuille**.")
-        except (ValueError, sqlite3.Error) as e:
+        except db.SAVE_ERRORS as e:
             st.error(f"Création impossible : {e}")
 with b2:
     st.markdown("Ce portefeuille est transmis à la page **Simulations** (rendement et volatilité ci-dessus).")

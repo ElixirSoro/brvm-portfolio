@@ -82,7 +82,7 @@ else:
 # ---------------- fil ----------------
 ui.section("Fil", "Les articles et leur impact")
 imp = signals.impacts(days)
-news = db.df("SELECT * FROM news WHERE published >= datetime('now', ?) ORDER BY published DESC", (f"-{days} days",))
+news = db.df("SELECT * FROM news WHERE published >= ? ORDER BY published DESC", (signals.cutoff_iso(days),))
 f1, f2, f3, f4 = st.columns(4)
 scope = f1.multiselect("Portée", sorted([s for s in news["scope"].dropna().unique() if s]))
 cat = f2.multiselect("Catégorie", ["endogène", "exogène"])

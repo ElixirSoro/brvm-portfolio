@@ -11,6 +11,8 @@ import pytest
 
 _TMP = tempfile.mkdtemp()
 os.environ["BRVM_DB_PATH"] = str(Path(_TMP) / "test.db")
+# TEST_DATABASE_URL=postgresql://… pytest  → toute la suite tourne aussi sur PostgreSQL
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from brvm import db, universe  # noqa: E402

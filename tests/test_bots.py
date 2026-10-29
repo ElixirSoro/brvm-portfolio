@@ -37,7 +37,8 @@ def test_analyze_and_signal_without_api_key(monkeypatch):
     with db.session() as con:
         con.execute(
             "INSERT INTO news (url, fingerprint, title, source, query, published, content, scope, theme) "
-            "VALUES ('u1','f1','SAPH : la production de caoutchouc progresse','test','', datetime('now'),'','CI','caoutchouc')"
+            "VALUES ('u1','f1','SAPH : la production de caoutchouc progresse','test','', ?,'','CI','caoutchouc')",
+            (db.now_utc(),),
         )
     r = analyst.analyze_pending()
     assert r["analyzed"] >= 1 and not r["ai_enabled"]

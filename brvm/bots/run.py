@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sqlite3
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -31,7 +30,7 @@ BOC_AFTER_HOUR = 17  # le BOC est publié en fin d'après-midi (heure d'Abidjan 
 DAY_S = 24 * 3600
 EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
     requests.RequestException,
-    sqlite3.Error,
+    *db.DB_ERRORS,
     ValueError,
     OSError,
     quotes.QuotesUnavailable,

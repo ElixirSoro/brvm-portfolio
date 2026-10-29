@@ -3,6 +3,7 @@
 from datetime import date
 from pathlib import Path
 
+import numpy as np
 import pytest
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
@@ -251,3 +252,20 @@ def test_refresh_reports_feeds_the_news(monkeypatch):
     assert (news["category"] == "endogène").all() and (news["theme"] == "societe:BOAC").all()
     with pytest.raises(ValueError):
         documents.refresh_reports([])
+
+
+def test_postgres_translation():
+    assert db.to_postgres("SELECT * FROM news WHERE url=? AND title LIKE '%x%'") == (
+        "SELECT * FROM news WHERE url=%s AND title LIKE '%%x%%'"
+    )
+    assert db.to_postgres("INSERT OR IGNORE INTO corporate_actions VALUES (?,?,?)") == (
+        "INSERT INTO corporate_actions (ticker, date, ratio) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING"
+    )
+    up = db.to_postgres("INSERT OR REPLACE INTO prices (ticker, date, close) VALUES ('BRVMC', ?, ?)")
+    assert up.endswith("ON CONFLICT (ticker, date) DO UPDATE SET close = EXCLUDED.close")
+    assert db.to_postgres("INSERT INTO portfolios (name, note) VALUES (?, ?)").endswith("RETURNING id")
+    with pytest.raises(ValueError):
+        db.to_postgres("INSERT OR REPLACE INTO inconnue VALUES (?)")
+    with pytest.raises(ValueError):
+        db.to_postgres("  ")
+    assert db._params((np.float64("nan"), np.int64(3), True)) == (None, 3, 1)

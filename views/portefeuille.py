@@ -2,14 +2,13 @@
 
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # la logique est dans le paquet brvm, la page ne fait qu'afficher.
-import sqlite3
 from datetime import date
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from brvm import fees, market, portfolio, ui
+from brvm import db, fees, market, portfolio, ui
 
 ui.setup(
     "Mon portefeuille",
@@ -27,7 +26,7 @@ with c2.popover("Nouveau portefeuille", icon=":material/add:", width="stretch"):
         try:
             portfolio.create(new_name, new_note)
             st.rerun()
-        except (ValueError, sqlite3.Error) as e:
+        except db.SAVE_ERRORS as e:
             st.error(f"Impossible : {e}")
 if ports.empty:
     st.info("Crée ton premier portefeuille avec le bouton **Nouveau portefeuille**, ou depuis l'optimiseur.")
@@ -175,7 +174,7 @@ with tab_add:
             st.cache_data.clear()
             st.toast("Opération enregistrée.")
             st.rerun()
-        except (ValueError, sqlite3.Error) as e:
+        except db.SAVE_ERRORS as e:
             st.error(str(e))
     if kind in ("ACHAT", "VENTE") and qty and price:
         of = fees.order_fees(qty * price)
@@ -270,7 +269,7 @@ with tab_io:
             n = portfolio.import_csv(pid, up)
             st.cache_data.clear()
             st.success(f"{n} opérations importées.")
-        except (ValueError, KeyError, sqlite3.Error, pd.errors.ParserError, UnicodeDecodeError) as e:
+        except (KeyError, pd.errors.ParserError, UnicodeDecodeError, *db.SAVE_ERRORS) as e:
             st.error(f"Import impossible : {e}")
     tx = portfolio.transactions(pid)
     if not tx.empty:
