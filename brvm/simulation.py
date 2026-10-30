@@ -80,7 +80,7 @@ def _draw(model: Returns, n_paths: int, months: int, rng: np.random.Generator) -
         if len(hist) < max(MIN_BOOTSTRAP_MONTHS, model.block + 1):
             raise ValueError(f"Historique mensuel trop court pour le bootstrap ({MIN_BOOTSTRAP_MONTHS} mois minimum).")
         starts = rng.integers(0, len(hist) - model.block, size=(n_paths, months // model.block + 1))
-        r = np.concatenate([hist[s : s + model.block] for s in starts.ravel()]).reshape(n_paths, -1)[:, :months]
+        r = hist[starts[:, :, None] + np.arange(model.block)].reshape(n_paths, -1)[:, :months]
     else:
         m_mu = np.log(1 + model.mu) / 12 - model.sigma**2 / 24
         r = np.exp(rng.normal(m_mu, model.sigma / np.sqrt(12), size=(n_paths, months))) - 1
