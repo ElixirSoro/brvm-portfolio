@@ -14,7 +14,7 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 VIDEOS = (
     ("ecole-1-bourse.mp4", "1 · La bourse, c'est quoi ?", "Le marché où l'on achète des morceaux d'entreprises."),
     ("ecole-2-brvm.mp4", "2 · La BRVM, notre bourse", "Huit pays, une bourse, des entreprises que tu connais."),
-    ("ecole-3-investir.mp4", "3 · Comment investir", "SGI, compte-titres, ordre d'achat et frais."),
+    ("ecole-3-investir.mp4", "3 · Comment investir", "Seul via une SGI ou en fonds via une SGO, compte-titres, ordre et frais."),
     ("ecole-4-risques.mp4", "4 · Les risques", "N'investir que l'argent dont on n'a pas besoin."),
 )
 CRISIS_KEY, HISTORY_KEY, DONE_KEY = "ecole_crise", "ecole_crise_hist", "ecole_crise_fin"
