@@ -1,5 +1,7 @@
 # BRVM Portfolio
 
+**Site en ligne : [Mr investor](https://brvm-portfolio-soro.streamlit.app)** (compte gratuit à créer à la première visite)
+
 Logiciel local pour construire, simuler et suivre un portefeuille d'actions de la BRVM selon son aversion au risque, avec une veille automatique de tout ce qui peut faire bouger les cours.
 
 Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -82,6 +84,8 @@ tests/                  98 tests (données synthétiques, extraits réels de BOC
 ```
 
 ## Version en ligne
+
+Adresse : <https://brvm-portfolio-soro.streamlit.app>
 
 **Comptes** : en ligne, chaque personne crée un compte (e-mail et mot de passe, Supabase Auth) et ne voit que
 ses propres portefeuilles, opérations et grille de frais ; les cours, documents officiels et la veille sont
