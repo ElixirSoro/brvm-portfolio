@@ -3,10 +3,13 @@
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # le contenu est déclaré dans STEPS, la page ne fait qu'afficher.
 from dataclasses import dataclass
+from pathlib import Path
 
 import streamlit as st
 
 from brvm import db, ui
+
+VIDEO = Path(__file__).resolve().parent.parent / "assets" / "tutoriel.mp4"
 
 
 @dataclass(frozen=True)
@@ -178,7 +181,20 @@ has_prices = not db.df("SELECT 1 FROM prices LIMIT 1").empty
 if not has_prices:
     st.warning("Aucun cours en base pour l'instant : commence par l'étape 1.", icon=":material/flag:")
 
-tab_start, tab_steps, tab_routine, tab_faq = st.tabs(["En bref", "Pas à pas", "Routine", "Questions fréquentes"])
+tab_video, tab_start, tab_steps, tab_routine, tab_faq = st.tabs(
+    ["Vidéo", "En bref", "Pas à pas", "Routine", "Questions fréquentes"]
+)
+
+with tab_video:
+    ui.section("En vidéo", "Mr investor en une minute et demie")
+    if not VIDEO.exists():
+        st.warning("La vidéo du tutoriel est introuvable dans le dossier assets.")
+    else:
+        st.video(str(VIDEO))
+        st.caption(
+            "Treize étapes, de la création du compte au suivi du portefeuille. Les chiffres affichés sont des données "
+            "de démonstration. Le détail écrit de chaque étape est dans l'onglet « Pas à pas »."
+        )
 
 with tab_start:
     ui.section("Le principe", "Quatre questions, quatre pages")

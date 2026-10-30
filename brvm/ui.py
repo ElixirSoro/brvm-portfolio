@@ -79,7 +79,7 @@ pio.templates.default = "elixir"
 
 
 # DÉROGATION règle 10 : st.cache_resource n'est pas annoté par Streamlit (mypy --strict le signale).
-@st.cache_resource  # type: ignore[untyped-decorator]
+@st.cache_resource(show_spinner=False)  # type: ignore[untyped-decorator]
 def _init_db() -> bool:
     """Initialise la base une seule fois par serveur et charge les dividendes si la table est vide.
 

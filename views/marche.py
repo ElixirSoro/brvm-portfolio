@@ -14,7 +14,7 @@ if ui.no_data_warning():
     st.stop()
 
 
-@st.cache_data(ttl=300)  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+@st.cache_data(ttl=300, show_spinner="Chargement des cours…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
 def quotes() -> pd.DataFrame:
     """Derniers cours (mis en cache)."""
     return market.latest_quotes()
