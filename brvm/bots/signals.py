@@ -40,7 +40,9 @@ def ticker_signals(days: int = 60) -> pd.DataFrame:
     """Signal de veille par action : moyenne pondérée des scores (-2 à +2) sur `days` jours."""
     d = impacts(days)
     if d.empty:
-        return pd.DataFrame(columns=["signal", "articles", "positives", "negatives"])
+        return pd.DataFrame(
+            {"signal": pd.Series(dtype=float), **{c: pd.Series(dtype=int) for c in ("articles", "positives", "negatives")}}
+        )
     now = pd.Timestamp.now(tz="UTC")
     age = (now - d["published"]).dt.total_seconds() / 86400
     hl = d["horizon"].map(HALF_LIFE_DAYS).fillna(30)

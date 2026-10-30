@@ -109,7 +109,9 @@ def estimate(
     y = q["yield_net"].reindex(keep).fillna(0.0).clip(0, MAX_YIELD_USED)
     mu = (shrunk + y).clip(*MU_BOUNDS)
     if signals is not None and p.get("signal_tilt", 0):
-        mu = mu + p["signal_tilt"] * signals.reindex(keep).fillna(0.0) / 2  # signal −2..+2 → ±tilt
+        # signal −2..+2 → ±tilt ; conversion explicite : une table de signaux vide est de type objet
+        sig = pd.to_numeric(signals.reindex(keep), errors="coerce").astype(float).fillna(0.0).clip(-2, 2)
+        mu = mu + p["signal_tilt"] * sig / 2
     cov = pd.DataFrame(shrunk_cov(r.values) * WEEKS_PER_YEAR, index=keep, columns=keep)
     assert np.isfinite(mu).all() and np.isfinite(cov.values).all()
     secs = market.securities()
