@@ -45,3 +45,31 @@ def test_optimizer_with_signal_tilt() -> None:
     slider = next(s for s in at.slider if s.label == "Poids donné aux signaux de veille")
     slider.set_value(2.0).run()
     assert not at.exception, [e.value for e in at.exception]
+
+
+@pytest.mark.skipif(not LOCAL, reason="en ligne, les pages exigent un compte")
+def test_premiers_pas_level_saves_and_unlocks() -> None:
+    """Niveau 1 réussi → 3 étoiles enregistrées et niveau 2 débloqué ; jeu de crise joué jusqu'au bout."""
+    from brvm import auth, ecole
+
+    auth.set_owner(auth.LOCAL_OWNER)
+    db.set_setting(ecole.PROGRESS_SETTING, {})
+    at = _app()
+    at.switch_page("views/premiers_pas.py").run()
+    assert not at.exception, [e.value for e in at.exception]
+    radios = [r for r in at.radio if r.label in {item for item, _ in ecole.MONEY_ITEMS}]
+    for r, (_, right) in zip(radios, ecole.MONEY_ITEMS, strict=True):
+        r.set_value(right)
+    next(b for b in at.button if b.label == "Valider").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert db.get_setting(ecole.PROGRESS_SETTING) == {"argent": 3}
+    assert any("Parfait" in s.value for s in at.success)
+    assert not any("Termine le niveau précédent" in c.value for c in at.caption[:1])
+    db.set_setting(ecole.PROGRESS_SETTING, dict.fromkeys(ecole.LEVEL_KEYS[:-1], 3))
+    at.run()
+    for _ in ecole.YEARS:
+        next(b for b in at.button if b.label == ecole.HOLD).click().run()
+        assert not at.exception, [e.value for e in at.exception]
+    assert db.get_setting(ecole.PROGRESS_SETTING)["crise"] == 3
+    assert any("Investisseur averti" in m.value for m in at.markdown)
+    db.set_setting(ecole.PROGRESS_SETTING, {})
