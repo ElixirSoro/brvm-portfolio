@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -181,3 +183,20 @@ def test_signal_tilt_with_empty_or_object_signals():
     up = optimizer.estimate({"min_daily_value": 0, "signal_tilt": 0.02}, signals=one)
     assert up.mu[t] == pytest.approx(base.mu[t] + 0.02)
     assert np.allclose(up.mu.drop(t), base.mu.drop(t))
+
+
+def test_bootstrap_draw_and_required_monthly():
+    """Bootstrap par blocs : blocs contigus de l'historique ; le versement nécessaire utilise ce même modèle."""
+    hist = pd.Series(np.linspace(-0.04, 0.05, 60))
+    model = simulation.Returns(history=hist, method="bootstrap", block=3)
+    r = simulation._draw(model, 50, 24, np.random.default_rng(1))
+    assert r.shape == (50, 24)
+    first = r[0, :3]
+    start = int(np.argmin(np.abs(hist.values - first[0])))
+    assert np.allclose(first, hist.values[start : start + 3])
+    plan = simulation.Plan(initial=100_000, monthly=0, years=5, goal=2_000_000, buy_fee_rate=0.0, custody_rate=0.0)
+    need = simulation.required_monthly(plan, model, confidence=0.7, n_paths=500)
+    reached = simulation.simulate(replace(plan, monthly=need), model, 500)["prob_goal"]
+    assert reached >= 0.7
+    below = simulation.simulate(replace(plan, monthly=need * 0.95), model, 500)["prob_goal"]
+    assert below < 0.7

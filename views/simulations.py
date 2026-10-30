@@ -136,7 +136,7 @@ conf = st.select_slider(
 )
 if st.button("Calculer le versement nécessaire", icon=":material/calculate:"):
     with st.spinner("Recherche du versement…"):
-        need = simulation.required_monthly(plan, simulation.Returns(mu, sigma), conf)
+        need = simulation.required_monthly(plan, model, conf)  # même modèle que la projection ci-dessus
     st.markdown(
         f"Pour atteindre **{ui.mfcfa(goal)}** en {years} ans avec {ui.pct(conf, 0)} de chances, il faut verser environ "
         f"<span class='elx-metric' style='font-size:22px'>{ui.fcfa(np.ceil(need / 500) * 500)}</span> par mois.",
