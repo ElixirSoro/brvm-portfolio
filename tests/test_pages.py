@@ -35,3 +35,13 @@ def test_signed_out_visitor_only_sees_login() -> None:
     assert [t.value for t in at.title] == ["Bienvenue sur Mr investor"]
     with pytest.raises(ValueError):
         at.switch_page("views/portefeuille.py")
+
+
+@pytest.mark.skipif(not LOCAL, reason="en ligne, les pages exigent un compte")
+def test_optimizer_with_signal_tilt() -> None:
+    """Régression : déplacer « Poids donné aux signaux de veille » ne doit pas planter, avec ou sans signaux."""
+    at = _app()
+    at.switch_page("views/optimiseur.py").run()
+    slider = next(s for s in at.slider if s.label == "Poids donné aux signaux de veille")
+    slider.set_value(2.0).run()
+    assert not at.exception, [e.value for e in at.exception]

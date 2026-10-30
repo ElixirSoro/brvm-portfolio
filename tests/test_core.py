@@ -167,3 +167,17 @@ def test_core_validations():
         optimizer.shrunk_cov(np.zeros(3))
     with pytest.raises(ValueError):
         portfolio.create("  ")
+
+
+def test_signal_tilt_with_empty_or_object_signals():
+    """Régression : sans aucun signal de veille, incliner le rendement espéré ne doit pas planter."""
+    base = optimizer.estimate({"min_daily_value": 0})
+    empty = pd.DataFrame(columns=["signal"])["signal"]  # type objet, comme une table vide
+    tilted = optimizer.estimate({"min_daily_value": 0, "signal_tilt": 0.02}, signals=empty)
+    assert tilted.mu.dtype == float
+    assert np.allclose(tilted.mu, base.mu)
+    t = base.tickers[0]
+    one = pd.Series({t: "2"}, dtype=object)  # valeur textuelle, bornée à +2
+    up = optimizer.estimate({"min_daily_value": 0, "signal_tilt": 0.02}, signals=one)
+    assert up.mu[t] == pytest.approx(base.mu[t] + 0.02)
+    assert np.allclose(up.mu.drop(t), base.mu.drop(t))
