@@ -228,6 +228,7 @@ st.warning(
 tab_videos, tab_game = st.tabs(["Vidéos", "Le parcours"])
 
 with tab_videos:
+    st.caption("Awa, ta guide, t'explique tout en quatre courtes vidéos. Active le son 🔊")
     for file, title, summary in VIDEOS:
         ui.section("En vidéo", title)
         st.caption(summary)
