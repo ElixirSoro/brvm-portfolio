@@ -10,6 +10,7 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 
 | Page | Usage |
 | --- | --- |
+| Premiers pas en bourse | Quatre vidéos animées (la bourse, la BRVM, comment investir, les risques) et un parcours-jeu en 7 niveaux avec étoiles et badge |
 | Tutoriel | Les six étapes pour démarrer, la routine de suivi et les questions fréquentes, avec un lien vers chaque page |
 | Accueil | Indice du jour, plus fortes variations, signaux de veille, état des portefeuilles |
 | Marché | Les 48 valeurs : cours, variation, rendement en dividende net, liquidité, signal ; historique d'une valeur et ses actualités |

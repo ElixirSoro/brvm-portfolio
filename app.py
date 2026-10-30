@@ -8,6 +8,7 @@ st.set_page_config(page_title=ui.APP_NAME, page_icon="◆", layout="wide")
 
 PAGES = [
     st.Page("views/accueil.py", title="Accueil", icon=":material/home:", default=True),
+    st.Page("views/premiers_pas.py", title="Premiers pas en bourse", icon=":material/rocket_launch:"),
     st.Page("views/tutoriel.py", title="Tutoriel", icon=":material/school:"),
     st.Page("views/marche.py", title="Marché", icon=":material/candlestick_chart:"),
     st.Page("views/optimiseur.py", title="Profil et optimiseur", icon=":material/tune:"),
