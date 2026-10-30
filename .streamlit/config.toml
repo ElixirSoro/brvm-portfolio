@@ -12,6 +12,10 @@ codeFont = "JetBrains Mono, monospace"
 [server]
 headless = true
 runOnSave = false
+# Pas de rechargement à chaud : Streamlit ne recharge que les modules modifiés, alors que le paquet brvm garde
+# des références aux anciennes versions (« from . import auth » renvoie l'ancien module). Après une mise à jour
+# du code : Reboot de l'app en ligne, ou relance de l'application en local.
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false

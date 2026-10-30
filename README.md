@@ -103,6 +103,8 @@ une base PostgreSQL Supabase (projet `brvm-portfolio`, us-east-1).
 - Les tables Supabase ont la sécurité par ligne activée sans règle : elles ne sont pas lisibles
   depuis l'API publique, seul le serveur de l'application s'y connecte.
 - Tests sur PostgreSQL : `TEST_DATABASE_URL=postgresql://… pytest -q`.
+- **Après chaque mise à jour du code** (fusion dans `main`) : share.streamlit.io › ⋮ › **Reboot**. Le rechargement
+  à chaud est désactivé (`.streamlit/config.toml`) : il mélangeait anciennes et nouvelles versions des modules.
 
 ## Fiabilité du code
 

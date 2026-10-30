@@ -82,3 +82,18 @@ def test_delete_account_removes_all_personal_data(users):
     assert db.df("SELECT 1 FROM portfolios WHERE owner = ?", (users.id,)).empty
     assert db.df("SELECT 1 FROM settings WHERE key LIKE ?", (f"{users.id}/%",)).empty
     assert not auth.is_active(users.id)
+
+
+def test_admin_page_runs_for_an_admin(users):
+    from pathlib import Path
+
+    from streamlit.testing.v1 import AppTest
+
+    from brvm import ui
+
+    at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=120)
+    at.session_state[ui.SESSION_USER] = {"id": ADMIN.id, "email": ADMIN.email}
+    at.run()
+    at.switch_page("views/administration.py").run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert "Créer un mot de passe provisoire" in [b.label for b in at.button]
