@@ -11,6 +11,7 @@ PAGES = [
     st.Page("views/premiers_pas.py", title="Premiers pas en bourse", icon=":material/rocket_launch:"),
     st.Page("views/tutoriel.py", title="Tutoriel", icon=":material/school:"),
     st.Page("views/marche.py", title="Marché", icon=":material/candlestick_chart:"),
+    st.Page("views/historique.py", title="Historique des cours", icon=":material/history:"),
     st.Page("views/optimiseur.py", title="Profil et optimiseur", icon=":material/tune:"),
     st.Page("views/simulations.py", title="Simulations", icon=":material/insights:"),
     st.Page("views/portefeuille.py", title="Mon portefeuille", icon=":material/account_balance_wallet:"),

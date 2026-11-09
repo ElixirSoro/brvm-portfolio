@@ -212,3 +212,34 @@ def test_signal_tilt_cannot_cross_mu_bounds():
     low = {**params, "price_prior": -0.30}
     down = optimizer.estimate(low, signals=pd.Series(-2.0, index=base.tickers))
     assert down.mu.min() >= optimizer.MU_BOUNDS[0] - 1e-12
+
+
+def test_history_ohlc_frequencies_and_split_adjustment():
+    from datetime import date
+
+    from brvm import db, market
+
+    rows = [
+        ("HIST", "2026-03-02", 100, 110, 95, 105, 10),
+        ("HIST", "2026-03-03", 105, 108, 100, 102, 20),
+        ("HIST", "2026-03-06", 102, 120, 101, 118, 5),
+        ("HIST", "2026-03-09", 30, 31, 29, 30, 40),  # après un fractionnement par 4
+    ]
+    for r in rows:
+        db.execute("INSERT OR REPLACE INTO prices (ticker, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)", r)
+    db.execute("INSERT OR REPLACE INTO corporate_actions (ticker, date, ratio) VALUES ('HIST', '2026-03-09', 4)")
+    try:
+        day = market.history("HIST", date(2026, 3, 3), date(2026, 3, 9))
+        assert list(day.index.strftime("%d")) == ["09", "06", "03"]  # du plus récent au plus ancien
+        assert day.loc["2026-03-03", "change"] == pytest.approx(102 / 105 - 1)  # la veille sert de référence
+        assert day.loc["2026-03-03", "value"] == 20 * 102
+        week = market.history("HIST", date(2026, 3, 1), date(2026, 3, 9), "Semaine")
+        first = week.loc["2026-03-06"]
+        assert (first["open"], first["high"], first["low"], first["close"], first["volume"]) == (100, 120, 95, 118, 35)
+        adj = market.history("HIST", date(2026, 3, 1), date(2026, 3, 9), adjusted=True)
+        assert adj.loc["2026-03-06", "high"] == pytest.approx(30) and adj.loc["2026-03-09", "close"] == 30
+        with pytest.raises(ValueError):
+            market.history("HIST", date(2026, 3, 9), date(2026, 3, 1))
+    finally:
+        db.execute("DELETE FROM prices WHERE ticker = 'HIST'")
+        db.execute("DELETE FROM corporate_actions WHERE ticker = 'HIST'")

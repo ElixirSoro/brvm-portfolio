@@ -63,6 +63,46 @@ def adjust_splits(panel: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+FREQUENCIES = {"Jour": None, "Semaine": "W-FRI", "Mois": "ME"}
+OHLC = ("open", "high", "low", "close")
+MARGIN_DAYS = 45  # cours chargés avant le début de la période, pour la variation de la première ligne
+
+
+def history(ticker: str, start: date, end: date, freq: str = "Jour", adjusted: bool = False) -> pd.DataFrame:
+    """Cours d'une valeur entre deux dates, du plus récent au plus ancien, comme les tableaux de la BRVM.
+
+    Colonnes : open, high, low, close, volume, value (titres x cours de clôture), change (variation de la
+    clôture par rapport à la ligne précédente). `freq` : Jour, Semaine (arrêtée au vendredi) ou Mois.
+    `adjusted` : cours divisés comme ceux d'après un fractionnement (comparaison sur longue période).
+    """
+    if freq not in FREQUENCIES:
+        raise ValueError(f"fréquence inconnue : {freq}")
+    if not ticker or start > end:
+        raise ValueError("valeur ou période invalide")
+    raw = db.df(
+        "SELECT date, open, high, low, close, volume FROM prices WHERE ticker = ? AND date BETWEEN ? AND ? ORDER BY date",
+        (ticker, (start - timedelta(days=MARGIN_DAYS)).isoformat(), end.isoformat()),
+    )
+    cols = [*OHLC, "volume", "value", "change"]
+    if raw.empty:
+        return pd.DataFrame(columns=cols, index=pd.DatetimeIndex([], name="date"))
+    raw["date"] = pd.to_datetime(raw["date"])
+    df = raw.set_index("date").astype(float)
+    df["value"] = df["volume"].fillna(0) * df["close"].fillna(0)
+    if adjusted:
+        factor = adjust_splits(df[["close"]].rename(columns={"close": ticker}))[ticker] / df["close"]
+        for c in OHLC:
+            df[c] = df[c] * factor.fillna(1.0)
+    rule = FREQUENCIES[freq]
+    if rule:
+        agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum", "value": "sum"}
+        df = df.resample(rule).agg(agg).dropna(subset=["close"])
+    df["change"] = df["close"].pct_change(fill_method=None)
+    out = df.loc[df.index >= pd.Timestamp(start), cols].sort_index(ascending=False)
+    assert out.index.is_monotonic_decreasing
+    return out
+
+
 def latest_quotes() -> pd.DataFrame:
     """Dernier cours, variation du jour, variation depuis le 1er janvier, volume, valeur échangée moyenne."""
     panel = close_panel(years=1.2)
