@@ -140,7 +140,8 @@ def weekly_returns(years: float = 5, tickers: list[str] | None = None) -> pd.Dat
     panel = close_panel(years=years, tickers=tickers)
     stocks = [c for c in panel.columns if c not in universe.INDEX_TICKERS]
     weekly = panel[stocks].resample("W-FRI").last().ffill(limit=4)
-    return np.log(weekly).diff().iloc[1:]
+    logp = pd.DataFrame(np.log(weekly.to_numpy(dtype=float)), index=weekly.index, columns=weekly.columns)
+    return logp.diff().iloc[1:]
 
 
 def monthly_returns(years: float = 10, tickers: list[str] | None = None) -> pd.DataFrame:

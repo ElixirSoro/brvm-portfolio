@@ -4,6 +4,8 @@
 # la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import pandas as pd
 import plotly.graph_objects as go
+from typing import cast
+
 import streamlit as st
 
 from brvm import config, db, market, ui
@@ -106,7 +108,8 @@ if not news.empty:
             continue
         chips = (
             " ".join(
-                f'<span class="elx-chip">{r.ticker} {ui.colored(r.score, f"{r.score:+.0f}")}</span>' for r in rows.itertuples()
+                f'<span class="elx-chip">{r.ticker} {ui.colored(cast(float, r.score), f"{r.score:+.0f}")}</span>'
+                for r in rows.itertuples()
             )
             if not rows.empty
             else ""

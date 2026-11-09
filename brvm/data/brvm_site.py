@@ -74,8 +74,8 @@ def parse_session_date(html_text: str) -> date:
     return date(year, MONTHS_FR[month_name], day)
 
 
-def _stock_table(soup: BeautifulSoup) -> Tag | None:
-    """Tableau des cours actions de la page brvm.org, ou None s'il est absent."""
+def _stock_table(soup: BeautifulSoup) -> Tag:
+    """Tableau des cours actions de la page brvm.org ; BrvmParseError s'il est absent."""
     for table in soup.find_all("table"):
         first = table.find("th")
         if first is not None and first.get_text(strip=True) == EXPECTED_HEADER:
@@ -111,8 +111,9 @@ def _parse_rows(table: Tag) -> tuple[list[dict[str, Any]], int]:
 def _parse_index(soup: BeautifulSoup) -> dict[str, Any] | None:
     """Valeur et variation du BRVM Composite lues sur la page, ou None si absentes."""
     for td in soup.find_all("td"):
-        if td.get_text(strip=True) == "BRVM-C":
-            cells = [c.get_text(" ", strip=True) for c in td.find_parent("tr").find_all("td")]
+        row = td.find_parent("tr") if td.get_text(strip=True) == "BRVM-C" else None
+        if row is not None:
+            cells = [c.get_text(" ", strip=True) for c in row.find_all("td")]
             if len(cells) >= 3:
                 return {
                     "ticker": "BRVMC",

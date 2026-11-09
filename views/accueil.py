@@ -3,6 +3,8 @@
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # la logique est dans le paquet brvm, la page ne fait qu'afficher.
 import pandas as pd
+from typing import Any
+
 import streamlit as st
 
 from brvm import market, portfolio, ui
@@ -14,14 +16,15 @@ if ui.no_data_warning():
     st.stop()
 
 
-@st.cache_data(ttl=300, show_spinner="Chargement des cours…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+@st.cache_data(ttl=300, show_spinner="Chargement des cours…")
 def quotes() -> pd.DataFrame:
     """Derniers cours (mis en cache)."""
     return market.latest_quotes()
 
 
 q = quotes()
-idx = q.loc["BRVMC"] if "BRVMC" in q.index else None
+# ligne de l'indice : valeurs scalaires (dict) plutôt que Series, pour un typage exact
+idx: dict[str, Any] | None = {str(k): v for k, v in q.loc["BRVMC"].items()} if "BRVMC" in q.index else None
 stocks = q[q["sector"] != "Indice"]
 
 c1, c2 = st.columns([3, 1])
@@ -81,7 +84,7 @@ if not ports.empty:
     ui.section("Portefeuilles", "Où en sont tes portefeuilles")
     rows = []
     for _, p in ports.iterrows():
-        _, s = portfolio.valuation(int(p["id"]))
+        _pos, s = portfolio.valuation(int(p["id"]))
         rows.append(
             {
                 "Portefeuille": p["name"],

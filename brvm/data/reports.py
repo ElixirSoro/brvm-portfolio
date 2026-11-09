@@ -69,9 +69,10 @@ def parse_report_list(html: str, ticker: str) -> list[dict[str, Any]]:
             continue
         title = cell.get_text(" ", strip=True)
         kind, period = classify(title)
-        m = _PUBLISHED.search(a["href"])
+        href = str(a["href"])
+        m = _PUBLISHED.search(href)
         published = f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
-        out.append({"url": a["href"], "ticker": ticker, "title": title, "kind": kind, "period": period, "published": published})
+        out.append({"url": href, "ticker": ticker, "title": title, "kind": kind, "period": period, "published": published})
     return out
 
 

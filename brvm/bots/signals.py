@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ def cutoff_iso(days: int) -> str:
     """Date-heure UTC d'il y a `days` jours au format ISO, comparable aux dates `published` des articles."""
     if not 0 < days <= MAX_DAYS:
         raise ValueError(f"nombre de jours entre 1 et {MAX_DAYS} (reçu {days})")
-    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
 
 
 def impacts(days: int = 60) -> pd.DataFrame:
@@ -47,15 +47,17 @@ def ticker_signals(days: int = 60) -> pd.DataFrame:
     age = (now - d["published"]).dt.total_seconds() / 86400
     hl = d["horizon"].map(HALF_LIFE_DAYS).fillna(30)
     d["w"] = d["confidence"].clip(0, 1) * np.power(0.5, age / hl)
+    d["sw"] = d["score"] * d["w"]
+    d["pos"], d["neg"] = (d["score"] > 0).astype(int), (d["score"] < 0).astype(int)
     g = d.groupby("ticker")
+    wsum = g["w"].sum()
     out = pd.DataFrame(
         {
-            "signal": g.apply(
-                lambda x: (x["score"] * x["w"]).sum() / x["w"].sum() if x["w"].sum() > 0 else 0.0, include_groups=False
-            ),
+            # moyenne pondérée ; 0 si toutes les confiances sont nulles
+            "signal": (g["sw"].sum() / wsum.where(wsum > 0)).fillna(0.0),
             "articles": g.size(),
-            "positives": g.apply(lambda x: (x["score"] > 0).sum(), include_groups=False),
-            "negatives": g.apply(lambda x: (x["score"] < 0).sum(), include_groups=False),
+            "positives": g["pos"].sum(),
+            "negatives": g["neg"].sum(),
         }
     )
     return out.sort_values("signal")

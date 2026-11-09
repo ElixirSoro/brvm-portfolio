@@ -5,17 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover
-    load_dotenv = None
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-if load_dotenv:
-    load_dotenv(ROOT / ".env")
+load_dotenv(ROOT / ".env")
 
 DB_PATH = Path(os.getenv("BRVM_DB_PATH", DATA_DIR / "brvm.db"))
 

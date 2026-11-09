@@ -63,8 +63,11 @@ elif src == sources[2]:
     if ports.empty:
         st.info("Aucun portefeuille virtuel. Crée-en un dans **Mon portefeuille**.")
         st.stop()
-    pid = st.selectbox("Portefeuille", ports["id"], format_func=lambda i: ports.set_index("id").loc[i, "name"])
-    pos, summ = portfolio.valuation(int(pid))
+    names = dict(zip(ports["id"].astype(int), ports["name"], strict=True))
+    pid = st.selectbox("Portefeuille", list(names), format_func=names.__getitem__)
+    if pid is None:
+        st.stop()
+    pos, summ = portfolio.valuation(pid)
     initial = summ["total"]
     eq = pos[~pos["ticker"].str.startswith(portfolio.BOND_PREFIX)].set_index("ticker")["value"]
     inp = optimizer.estimate({"min_daily_value": 0})

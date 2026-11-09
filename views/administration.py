@@ -54,7 +54,10 @@ others = acc[acc["id"] != actor.id]
 if others.empty:
     st.info("Aucun autre compte que le tien.")
     st.stop()
-uid = st.selectbox("Compte", others["id"], format_func=lambda i: others.set_index("id").loc[i, "email"])
+emails = {str(i): str(e) for i, e in zip(others["id"], others["email"], strict=True)}
+uid = st.selectbox("Compte", list(emails), format_func=emails.__getitem__)
+if uid is None:
+    st.stop()
 row = others.set_index("id").loc[uid]
 c1, c2, c3 = st.columns(3)
 
@@ -80,7 +83,7 @@ with c2:
     rights = "Retirer les droits d'administration" if row["admin"] else "Nommer administrateur"
     if st.button(rights, icon=":material/shield_person:"):
         try:
-            admin.set_admin(actor, row["email"], not row["admin"])
+            admin.set_admin(actor, emails[uid], not bool(row["admin"]))
             st.rerun()
         except ERRORS as e:
             st.error(str(e))

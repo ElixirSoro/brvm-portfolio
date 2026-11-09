@@ -23,7 +23,7 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 
 ## Installation (Mac)
 
-1. Double-clique sur **Lancer BRVM Portfolio.command**. Le premier lancement crée un environnement Python et installe les dépendances (2 à 3 minutes), puis ouvre l'application dans le navigateur.
+1. Il faut **Python 3.12 ou plus récent** ([python.org](https://www.python.org/downloads/)). Double-clique sur **Lancer BRVM Portfolio.command**. Le premier lancement crée un environnement Python et installe les dépendances (2 à 3 minutes), puis ouvre l'application dans le navigateur.
    Si macOS bloque le fichier : clic droit → Ouvrir → Ouvrir.
 2. Dans **Réglages**, clique sur **Importer ce dossier** pour charger l'historique déjà téléchargé par `Cote_scrapper` (`~/BRVM_DATA_SCRAP`), ou sur **Télécharger / compléter l'historique** pour tout récupérer depuis Sika Finance.
 3. Dans **Réglages**, recopie la grille de frais de ta SGI.
@@ -33,12 +33,12 @@ En ligne de commande :
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 streamlit run app.py                 # l'application
 python -m brvm.bots.run              # un passage des bots
 python -m brvm.bots.run --loop       # les bots pendant 7 jours (--hours pour changer ; ou « Lancer les bots.command »)
 pytest -q                            # les tests
-ruff check . && mypy brvm            # contrôle qualité (zéro avertissement attendu)
+ruff check . && python -m mypy      # contrôle qualité (zéro avertissement attendu ; la CI fait de même)
 ```
 
 ## Bon à savoir
