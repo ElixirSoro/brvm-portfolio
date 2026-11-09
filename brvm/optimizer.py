@@ -107,11 +107,13 @@ def estimate(
     # ne sont pas extrapolées sur 10 ans
     shrunk = (1 - p["shrinkage"]) * price_ret + p["shrinkage"] * p["price_prior"]
     y = q["yield_net"].reindex(keep).fillna(0.0).clip(0, MAX_YIELD_USED)
-    mu = (shrunk + y).clip(*MU_BOUNDS)
+    mu = shrunk + y
     if signals is not None and p.get("signal_tilt", 0):
         # signal −2..+2 → ±tilt ; conversion explicite : une table de signaux vide est de type objet
         sig = pd.to_numeric(signals.reindex(keep), errors="coerce").astype(float).fillna(0.0).clip(-2, 2)
         mu = mu + p["signal_tilt"] * sig / 2
+    mu = mu.clip(*MU_BOUNDS)  # bornes appliquées en dernier : la veille ne peut pas les franchir
+    assert ((mu >= MU_BOUNDS[0]) & (mu <= MU_BOUNDS[1])).all()
     cov = pd.DataFrame(shrunk_cov(r.values) * WEEKS_PER_YEAR, index=keep, columns=keep)
     assert np.isfinite(mu).all() and np.isfinite(cov.values).all()
     secs = market.securities()
