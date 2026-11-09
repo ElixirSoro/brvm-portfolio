@@ -14,6 +14,7 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 | Tutoriel | Les six étapes pour démarrer, la routine de suivi et les questions fréquentes, avec un lien vers chaque page |
 | Accueil | Indice du jour, plus fortes variations, signaux de veille, état des portefeuilles |
 | Marché | Les 48 valeurs : cours, variation, rendement en dividende net, liquidité, signal ; historique d'une valeur et ses actualités |
+| Historique des cours | Cours d'une valeur ou d'un indice depuis 2016, par jour, semaine ou mois : ouverture, plus haut, plus bas, clôture, variation, titres et valeur échangés ; ajustement des fractionnements ; export Excel et CSV |
 | Profil et optimiseur | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
 | Simulations | Monte-Carlo sur 1 à 30 ans : fourchette des résultats, probabilité d'atteindre l'objectif, versement nécessaire |
 | Mon portefeuille | Copie virtuelle du portefeuille réel : opérations, frais, dividendes nets d'IRVM, droits de garde, performance vs BRVM Composite |
