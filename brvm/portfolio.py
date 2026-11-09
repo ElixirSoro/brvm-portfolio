@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import Any, IO
+from typing import cast, Any, IO
 
 import numpy as np
 import pandas as pd
@@ -329,8 +329,8 @@ def history(pid: int) -> pd.DataFrame:
         for _, p in pos.iterrows():
             if p["ticker"].startswith(BOND_PREFIX):
                 v += p["cost"]
-            elif p["ticker"] in panel.columns and not np.isnan(panel.at[d, p["ticker"]]):
-                v += p["quantity"] * panel.at[d, p["ticker"]]
+            elif p["ticker"] in panel.columns and not np.isnan(px := cast(float, panel.at[d, p["ticker"]])):
+                v += p["quantity"] * px
             else:
                 v += p["cost"]
         values.append(v)

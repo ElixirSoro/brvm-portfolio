@@ -30,7 +30,7 @@ MAX_BOC_BATCH = 60
 MAX_PDF_TEXT_PAGES = 150
 UNKNOWN_PERIOD = "inconnue"
 
-Progress = Callable[[float, str], None]
+Progress = Callable[[float, str], object]  # la valeur renvoyée (barre Streamlit) est ignorée
 
 log = logging.getLogger(__name__)
 

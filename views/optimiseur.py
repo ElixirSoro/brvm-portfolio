@@ -37,7 +37,8 @@ with tab_direct:
     direct_pct = st.slider("Goût du risque", 0, 100, 55, format="%d %%", help="0 = très prudent, 100 = audacieux") / 100
 if use_direct:
     name, desc = risk_profile.profile_from_score(direct_pct)
-    prof = {"score_pct": direct_pct, "lambda": risk_profile.score_to_lambda(direct_pct), "profile": name, "description": desc}
+    lam = risk_profile.score_to_lambda(direct_pct)
+    prof: dict[str, Any] = {"score_pct": direct_pct, "lambda": lam, "profile": name, "description": desc}
 else:
     prof = quiz
 st.session_state["profile"] = prof
@@ -110,7 +111,7 @@ params = {
 }
 
 
-@st.cache_data(ttl=600, show_spinner="Estimation des rendements et des risques…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+@st.cache_data(ttl=600, show_spinner="Estimation des rendements et des risques…")
 def estimate(p: dict[str, Any], with_signals: bool) -> optimizer.Inputs:
     """Entrées de l'optimiseur, inclinées par les signaux de veille si demandé (mis en cache)."""
     sig = signals.ticker_signals()["signal"] if with_signals else None
@@ -200,7 +201,7 @@ with b2:
 ui.section("Comparer", "Frontière efficiente : plus de rendement contre plus de risque")
 
 
-@st.cache_data(ttl=600, show_spinner="Calcul de la frontière…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+@st.cache_data(ttl=600, show_spinner="Calcul de la frontière…")
 def front(p: dict[str, Any], with_signals: bool) -> pd.DataFrame:
     """Frontière efficiente (mise en cache)."""
     return optimizer.frontier(estimate(p, with_signals), p)

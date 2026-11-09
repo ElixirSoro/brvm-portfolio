@@ -85,7 +85,7 @@ def _draw(model: Returns, n_paths: int, months: int, rng: np.random.Generator) -
         m_mu = np.log(1 + model.mu) / 12 - model.sigma**2 / 24
         r = np.exp(rng.normal(m_mu, model.sigma / np.sqrt(12), size=(n_paths, months))) - 1
     assert r.shape == (n_paths, months)
-    return r
+    return np.asarray(r, dtype=float)
 
 
 def _paths(plan: Plan, r: np.ndarray, buy: float, custody: float) -> tuple[np.ndarray, list[float]]:

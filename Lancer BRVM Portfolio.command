@@ -3,7 +3,12 @@
 cd "$(dirname "$0")"
 if [ ! -d .venv ]; then
   echo "Premier lancement : création de l'environnement Python…"
-  python3 -m venv .venv || { echo "Python 3.10+ est nécessaire."; read -r; exit 1; }
+  PY=$(command -v python3.13 || command -v python3.12 || command -v python3)
+  if ! "$PY" -c 'import sys; sys.exit(sys.version_info < (3, 12))' 2>/dev/null; then
+    echo "Python 3.12 ou plus récent est nécessaire : https://www.python.org/downloads/ puis relance ce fichier."
+    read -r; exit 1
+  fi
+  "$PY" -m venv .venv || { echo "Création de l'environnement impossible."; read -r; exit 1; }
   ./.venv/bin/pip install --upgrade pip -q
 fi
 # (ré)installe les dépendances quand requirements.txt a changé depuis la dernière installation

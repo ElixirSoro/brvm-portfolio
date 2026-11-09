@@ -10,6 +10,9 @@ import streamlit as st
 
 from brvm import auth, db, fees, market, portfolio, ui
 
+# erreurs attendues d'un import CSV (fichier mal formé ou refusé par la base)
+IMPORT_ERRORS: tuple[type[Exception], ...] = (KeyError, pd.errors.ParserError, UnicodeDecodeError, *db.SAVE_ERRORS)
+
 ui.setup(
     "Mon portefeuille",
     "La copie virtuelle de ton portefeuille réel",
@@ -89,7 +92,7 @@ with tab_pos:
             "sont converties en actions actuelles."
         )
 
-        @st.cache_data(ttl=600, show_spinner="Reconstitution de l'historique…")  # type: ignore[untyped-decorator]  # DÉROGATION règle 10 : décorateur Streamlit non annoté
+        @st.cache_data(ttl=600, show_spinner="Reconstitution de l'historique…")
         def hist(p: int, n_tx: int, who: str) -> pd.DataFrame:
             """Historique du portefeuille ; `n_tx` invalide le cache après une opération, `who` l'isole par compte."""
             auth.set_owner(who)
@@ -130,19 +133,16 @@ with tab_pos:
 with tab_add:
     secs = market.securities()
     choices = [*list(secs.index), "OBLIG"]
-    kind = st.selectbox(
-        "Type d'opération",
-        portfolio.TYPES,
-        format_func={
-            "DEPOT": "Dépôt d'argent",
-            "RETRAIT": "Retrait d'argent",
-            "ACHAT": "Achat",
-            "VENTE": "Vente",
-            "DIVIDENDE": "Dividende reçu",
-            "COUPON": "Coupon d'obligation",
-            "FRAIS": "Frais (garde, tenue de compte…)",
-        }.get,
-    )
+    kind_labels = {
+        "DEPOT": "Dépôt d'argent",
+        "RETRAIT": "Retrait d'argent",
+        "ACHAT": "Achat",
+        "VENTE": "Vente",
+        "DIVIDENDE": "Dividende reçu",
+        "COUPON": "Coupon d'obligation",
+        "FRAIS": "Frais (garde, tenue de compte…)",
+    }
+    kind = st.selectbox("Type d'opération", portfolio.TYPES, format_func=kind_labels.__getitem__) or "DEPOT"
     f1, f2 = st.columns(2)
     day = f1.date_input("Date", date.today(), format="DD/MM/YYYY")
     note = f2.text_input("Note", "")
@@ -270,7 +270,7 @@ with tab_io:
             n = portfolio.import_csv(pid, up)
             st.cache_data.clear()
             st.success(f"{n} opérations importées.")
-        except (KeyError, pd.errors.ParserError, UnicodeDecodeError, *db.SAVE_ERRORS) as e:
+        except IMPORT_ERRORS as e:
             st.error(f"Import impossible : {e}")
     tx = portfolio.transactions(pid)
     if not tx.empty:

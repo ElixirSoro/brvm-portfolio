@@ -15,7 +15,7 @@ from typing import Any
 from .. import config, db
 from . import exposures
 
-Progress = Callable[[float, str], None]
+Progress = Callable[[float, str], object]  # la valeur renvoyée (barre Streamlit) est ignorée
 
 SYSTEM = """Tu es analyste actions sur la BRVM (Bourse régionale des valeurs mobilières, UEMOA).
 Pour chaque article, tu évalues son impact probable sur le cours des actions cotées à la BRVM.
@@ -222,10 +222,11 @@ def analyze_pending(limit: int = 120, batch_size: int = 10, progress: Progress |
     """Analyse les articles non encore notés (IA si clé, sinon mots-clés)."""
     if not 1 <= limit <= MAX_PENDING or not 1 <= batch_size <= MAX_BATCH:
         raise ValueError(f"limit 1..{MAX_PENDING} et batch_size 1..{MAX_BATCH} (reçu {limit}, {batch_size})")
-    pending = db.df(
+    rows = db.df(
         "SELECT id, title, source, published, content, theme, scope FROM news WHERE analyzed=0 ORDER BY published DESC LIMIT ?",
         (limit,),
     ).to_dict("records")
+    pending: list[dict[str, Any]] = [{str(k): v for k, v in r.items()} for r in rows]
     client = _client()
     done, ai, errors = 0, 0, []
     for i in range(0, len(pending), batch_size):

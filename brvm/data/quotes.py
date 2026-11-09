@@ -20,7 +20,7 @@ import requests
 from .. import db
 from . import brvm_site, sika
 
-Progress = Callable[[float, str], None]
+Progress = Callable[[float, str], object]  # la valeur renvoyée (barre Streamlit) est ignorée
 
 MIN_SIKA_OK = 40  # sur 50 séries (48 actions + 2 indices)
 

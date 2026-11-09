@@ -42,7 +42,7 @@ TIMEOUT_S = 30
 QUOTE_LOOKBACK_DAYS = 10
 MAX_YEARS = 25
 
-Progress = Callable[[float, str], None]
+Progress = Callable[[float, str], object]  # la valeur renvoyée (barre Streamlit) est ignorée
 Row = tuple[str, float | None, float | None, float | None, float | None, float | None]
 
 log = logging.getLogger(__name__)

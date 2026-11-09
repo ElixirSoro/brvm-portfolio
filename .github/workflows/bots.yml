@@ -1,0 +1,49 @@
+# Bots de collecte dans le nuage (cours, BOC, veille, rapports), sans dépendre du Mac.
+# Chaque passage sollicite la base : le projet Supabase gratuit ne se met plus en pause (7 jours sans activité).
+# Pré-requis : secret DATABASE_URL (même valeur que sur Streamlit) ; ANTHROPIC_API_KEY facultatif.
+name: Bots
+on:
+  schedule:
+    - cron: "37 17 * * 1-5"   # après la séance (BOC publié en fin d'après-midi, heure d'Abidjan = GMT) : passage complet
+    - cron: "23 7,12 * * *"   # veille, indicateurs et BOC manquants, tous les jours
+    - cron: "41 5 * * 0"      # dimanche : liste des rapports des 48 sociétés
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "complet, veille ou rapports"
+        default: complet
+permissions:
+  contents: read
+concurrency:
+  group: bots
+  cancel-in-progress: false
+jobs:
+  bots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Dépendances
+        run: pip install -r requirements.txt
+      - name: Choix du passage
+        id: mode
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT: ${{ github.event.inputs.mode }}
+        run: |
+          case "$SCHEDULE|$INPUT" in
+            "23 7,12 * * *|"*|*"|veille") echo "args=--no-quotes" >> "$GITHUB_OUTPUT" ;;
+            "41 5 * * 0|"*|*"|rapports") echo "args=--no-quotes --reports" >> "$GITHUB_OUTPUT" ;;
+            *) echo "args=" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Bots
+        run: python -m brvm.bots.run --require-postgres ${{ steps.mode.outputs.args }}

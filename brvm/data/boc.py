@@ -114,10 +114,11 @@ def list_bulletins(html: str) -> list[tuple[date, str]]:
         raise ValueError("HTML vide")
     found: dict[date, str] = {}
     for a in BeautifulSoup(html, "html.parser").find_all("a", href=True):
-        m = _BOC_HREF.search(a["href"])
+        href = str(a["href"])
+        m = _BOC_HREF.search(href)
         if m:
             d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            found.setdefault(d, a["href"])
+            found.setdefault(d, href)
     return sorted(found.items(), reverse=True)
 
 

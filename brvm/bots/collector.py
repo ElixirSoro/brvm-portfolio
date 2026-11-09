@@ -9,7 +9,7 @@ import unicodedata
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import feedparser
 import requests
@@ -26,7 +26,7 @@ MAX_WORKERS = 12
 FACTOR_PERIODS = {"1mo", "3mo", "6mo", "1y", "2y", "5y", "10y"}
 FEED_KEYS = {"url", "query", "theme", "scope", "source"}
 
-Progress = Callable[[float, str], None]
+Progress = Callable[[float, str], object]  # la valeur renvoyée (barre Streamlit) est ignorée
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
@@ -52,8 +52,8 @@ def _published(entry: Any) -> str:
         v = entry.get(k)
         if v:
             y, mo, d, h, mi, s = v[:6]
-            return datetime(y, mo, d, h, mi, s, tzinfo=timezone.utc).isoformat()
-    return datetime.now(timezone.utc).isoformat()
+            return datetime(y, mo, d, h, mi, s, tzinfo=UTC).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def fetch_feed(feed: dict[str, Any]) -> list[dict[str, Any]]:

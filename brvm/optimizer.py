@@ -54,7 +54,7 @@ def shrunk_cov(x: np.ndarray, intensity: float = 0.3) -> np.ndarray:
     rbar = (corr.sum() - n) / (n * (n - 1)) if n > 1 else 0.0
     target = rbar * np.outer(sd, sd)
     np.fill_diagonal(target, sd**2)
-    return intensity * target + (1 - intensity) * s
+    return np.asarray(intensity * target + (1 - intensity) * s, dtype=float)
 
 
 @dataclass
@@ -121,7 +121,7 @@ def estimate(
 def _with_bond(inp: Inputs, p: dict[str, Any]) -> tuple[list[str], np.ndarray, np.ndarray, pd.Series]:
     """Ajoute la poche obligataire (rendement fixe, variance nulle) aux entrées de l'optimiseur."""
     names = [*inp.tickers, BOND]
-    mu = np.append(inp.mu.values, p["bond_return"])
+    mu = np.append(inp.mu.to_numpy(dtype=float), p["bond_return"])
     n = len(names)
     cov = np.zeros((n, n))
     cov[:-1, :-1] = inp.cov.values
@@ -194,7 +194,7 @@ def stats(w: pd.Series, inp: Inputs, params: dict[str, Any] | None = None) -> di
     wv = w.reindex(names).fillna(0).values
     ret = float(mu @ wv)
     vol = float(np.sqrt(wv @ cov @ wv))
-    div = float((inp.yields.reindex(names).fillna(0).values * wv)[:-1].sum())
+    div = float((inp.yields.reindex(names).fillna(0).to_numpy(dtype=float) * wv)[:-1].sum())
     return {
         "expected_return": ret,
         "volatility": vol,
@@ -234,7 +234,7 @@ def _round_down(qty: pd.Series, prices: pd.Series, left: float, f: dict[str, Any
     for _ in range(int(qty.sum())):
         if left >= 0:
             break
-        t = (qty * prices).idxmax()
+        t = str((qty * prices).idxmax())
         before = fees_mod.buy_cost(qty[t], prices[t], f)[0]
         qty[t] -= 1
         after = fees_mod.buy_cost(qty[t], prices[t], f)[0] if qty[t] else 0
@@ -324,4 +324,4 @@ def portfolio_history(w: pd.Series, years: float = 5) -> pd.Series:
     r = np.exp(rets.reindex(columns=eq.index).fillna(0.0)) - 1
     bond_w = w.get(BOND, 0)
     pr = r @ eq.values + bond_w * ((1 + config.DEFAULT_OPTIM["bond_return"]) ** (1 / 52) - 1)
-    return 100 * (1 + pr).cumprod()
+    return pd.Series(100 * (1 + pr).cumprod(), name="value")

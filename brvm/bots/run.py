@@ -1,6 +1,8 @@
 """Lancement des bots en ligne de commande.
 
   python -m brvm.bots.run                 un passage : cours, actualités, analyse, indicateurs, BOC du jour
+  python -m brvm.bots.run --reports       ajoute la mise à jour de la liste des rapports des 48 sociétés
+  python -m brvm.bots.run --require-postgres   refuse de tourner sur une base locale (planification GitHub)
   python -m brvm.bots.run --loop          en continu pendant --hours heures (168 par défaut) :
                                           cours toutes les 5 min en séance, actualités toutes les heures,
                                           BOC du jour après la séance, rapports des sociétés une fois par jour
@@ -129,8 +131,12 @@ def main() -> None:
     p.add_argument("--loop", action="store_true", help="tourner en continu")
     p.add_argument("--hours", type=float, default=168.0, help="durée maximale de la boucle (heures)")
     p.add_argument("--no-quotes", action="store_true", help="ne pas rafraîchir les cours")
+    p.add_argument("--reports", action="store_true", help="mettre aussi à jour la liste des rapports des sociétés")
+    p.add_argument("--require-postgres", action="store_true", help="échouer si DATABASE_URL ne vise pas PostgreSQL")
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
+    if args.require_postgres and db.engine() != "postgres":
+        raise SystemExit("DATABASE_URL absent ou invalide : les bots écriraient dans une base locale jetable.")
     db.init()
     if args.loop:
         loop(args.hours, not args.no_quotes)
@@ -138,8 +144,12 @@ def main() -> None:
     cycles = [("Veille", news_cycle), ("Indicateurs", factors_cycle), ("BOC", boc_cycle)]
     if not args.no_quotes:
         cycles.insert(0, ("Cours", quotes_cycle))
+    if args.reports:
+        cycles.append(("Rapports", reports_cycle))
     ok = sum(run_safely(name, c) for name, c in cycles)
     log.info("%s cycles sur %s réussis", ok, len(cycles))
+    if ok == 0:
+        raise SystemExit("aucun cycle réussi")  # visible comme un échec dans GitHub Actions
 
 
 if __name__ == "__main__":

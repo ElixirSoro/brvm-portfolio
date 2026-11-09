@@ -21,7 +21,7 @@ import sqlite3
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -341,7 +341,7 @@ def set_setting(key: str, value: Any, path: Path | None = None) -> None:
 
 def now_utc() -> str:
     """Horodatage UTC au format 'AAAA-MM-JJ HH:MM:SS' (identique dans les deux moteurs)."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def mark_update(what: str, path: Path | None = None) -> None:

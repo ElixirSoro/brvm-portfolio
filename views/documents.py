@@ -178,7 +178,8 @@ with tab_fin:
             hide_index=True,
             width="stretch",
         )
-        pick = st.selectbox("Rapport à analyser", reps["url"], format_func=lambda u: reps.set_index("url").loc[u, "title"][:110])
+        titles = {str(u): str(t)[:110] for u, t in zip(reps["url"], reps["title"], strict=True)}
+        pick = st.selectbox("Rapport à analyser", list(titles), format_func=titles.__getitem__)
         ai_ok = bool(config.ANTHROPIC_API_KEY)
         use_ai = st.toggle(
             "Lire avec l'IA (indispensable pour les PDF scannés)",
