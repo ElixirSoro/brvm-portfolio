@@ -170,20 +170,30 @@ with left:
 with right:
     by_sector = w.groupby(pd.concat([inp.sectors, pd.Series({optimizer.BOND: "Obligations"})]).reindex(w.index)).sum()
     by_sector = by_sector[by_sector > 0].sort_values()
-    fig = go.Figure(
-        go.Bar(
-            x=by_sector.values,
-            y=by_sector.index,
-            orientation="h",
-            marker_color=[ui.ACCENT if v == by_sector.max() else ui.AZUR for v in by_sector.values],
-            text=[ui.pct(v, 0) for v in by_sector.values],
-            textposition="outside",
-            textfont={"family": ui.MONO},
+    fig = go.Figure()
+    top = by_sector.index == by_sector.idxmax()
+    for name, mask, color in (("Secteur le plus lourd", top, ui.ACCENT), ("Autres secteurs", ~top, ui.AZUR)):
+        part = by_sector[mask]
+        fig.add_trace(
+            go.Bar(
+                x=part.values,
+                y=part.index,
+                orientation="h",
+                name=name,
+                marker_color=color,
+                text=[ui.pct(v, 0) for v in part.values],
+                textposition="outside",
+                textfont={"family": ui.MONO},
+            )
         )
-    )
     fig.update_traces(cliponaxis=False)
-    fig.update_layout(height=320, title="Répartition par secteur", xaxis={"visible": False, "range": [0, by_sector.max() * 1.3]})
-    st.plotly_chart(fig, width="stretch")
+    fig.update_layout(
+        height=340,
+        title="Répartition par secteur (part du capital)",
+        xaxis={"visible": False, "range": [0, by_sector.max() * 1.45]},
+        yaxis={"categoryorder": "array", "categoryarray": list(by_sector.index)},
+    )
+    st.plotly_chart(ui.with_legend(fig, -0.05), width="stretch")
 
 b1, b2 = st.columns(2)
 with b1:
@@ -214,12 +224,12 @@ fig.add_trace(
         x=fr["volatility"],
         y=fr["expected_return"],
         mode="lines",
-        name="Frontière",
+        name="Frontière efficiente (meilleurs portefeuilles)",
         line={"color": ui.AZUR, "width": 2.4},
         hovertemplate="risque %{x:.1%}<br>rendement %{y:.1%}",
     )
 )
-for label, pctv in risk_profile.PRESETS.items():
+for i, (label, pctv) in enumerate(risk_profile.PRESETS.items()):
     wp = optimizer.optimize(inp, risk_profile.score_to_lambda(pctv), params, allow_bonds)
     sp = optimizer.stats(wp, inp, params)
     fig.add_trace(
@@ -230,7 +240,9 @@ for label, pctv in risk_profile.PRESETS.items():
             text=[label],
             textposition="bottom right",
             marker={"size": 9, "color": ui.MUTED},
-            showlegend=False,
+            name="Profils types",
+            legendgroup="profils",
+            showlegend=i == 0,
             textfont={"color": ui.BODY},
         )
     )
@@ -242,7 +254,7 @@ fig.add_trace(
         text=["Ton profil"],
         textposition="top left",
         marker={"size": 15, "color": ui.ACCENT, "line": {"color": ui.INK, "width": 1.5}},
-        showlegend=False,
+        name="Ton portefeuille",
         textfont={"color": ui.ACCENT, "family": ui.MONO},
     )
 )
@@ -264,9 +276,8 @@ fig.update_layout(
     yaxis_title="Rendement espéré annuel",
     xaxis_tickformat=".0%",
     yaxis_tickformat=".0%",
-    legend={"orientation": "h", "y": -0.2},
 )
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(ui.with_legend(fig, -0.2), width="stretch")
 
 ui.section("Passé", "Comment ce portefeuille se serait comporté")
 h = optimizer.portfolio_history(w, years=hist)
@@ -275,8 +286,8 @@ fig = go.Figure(go.Scatter(x=h.index, y=h.values, name="Ce portefeuille (base 10
 if "BRVMC" in idx and idx["BRVMC"].notna().any():
     b = idx["BRVMC"].resample("W-FRI").last().reindex(h.index).ffill().bfill()
     fig.add_trace(go.Scatter(x=b.index, y=100 * b / b.iloc[0], name="BRVM Composite", line={"color": ui.AZUR, "width": 1.6}))
-fig.update_layout(height=360, legend={"orientation": "h", "y": -0.15})
-st.plotly_chart(fig, width="stretch")
+fig.update_layout(height=360, yaxis_title="Base 100")
+st.plotly_chart(ui.with_legend(fig), width="stretch")
 st.caption(
     "Simulation rétrospective, rééquilibrée chaque semaine, hors frais et hors dividendes : "
     "les poids sont choisis avec les données de cette même période, le passé paraît donc meilleur qu'il ne l'était."

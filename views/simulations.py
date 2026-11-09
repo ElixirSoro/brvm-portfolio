@@ -117,10 +117,8 @@ fig.add_hline(
     annotation_text=f"Objectif {ui.mfcfa(goal)}",
     annotation_font={"color": ui.ACCENT, "family": ui.MONO},
 )
-fig.update_layout(
-    height=460, xaxis_title="Années", yaxis_title="FCFA", legend={"orientation": "h", "y": -0.18}, hovermode="x unified"
-)
-st.plotly_chart(fig, width="stretch")
+fig.update_layout(height=460, xaxis_title="Années", yaxis_title="FCFA", hovermode="x unified")
+st.plotly_chart(ui.with_legend(fig), width="stretch")
 
 a, b, c = st.columns(3)
 a.markdown(

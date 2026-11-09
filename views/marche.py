@@ -75,7 +75,7 @@ panel = market.close_panel(years=years, tickers=[pick, "BRVMC"])
 if pick in panel:
     s = panel[pick].dropna()
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=s.index, y=s.values, name=pick, line={"width": 2.2}))
+    fig.add_trace(go.Scatter(x=s.index, y=s.values, name=f"{pick} (cours en F)", line={"width": 2.2}))
     if "BRVMC" in panel and panel["BRVMC"].notna().any():
         b = panel["BRVMC"].reindex(s.index).ffill()
         fig.add_trace(
@@ -90,9 +90,8 @@ if pick in panel:
         height=380,
         title=f"{stocks.loc[pick, 'name']} — cours ajusté des fractionnements",
         yaxis_title="FCFA",
-        legend={"orientation": "h", "y": -0.15},
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(ui.with_legend(fig), width="stretch")
 
 imp = signals.impacts(days=90)
 if not imp.empty:

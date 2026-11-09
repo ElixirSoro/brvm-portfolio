@@ -5,7 +5,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from brvm import auth, config, db, ecole, fees, ui
@@ -155,7 +155,10 @@ def level_crisis() -> int | None:
         st.markdown(f"**Année {state.year}** · {event} Cours {ui.colored(move)}", unsafe_allow_html=True)
     where = "en actions" if state.stocks > 0 else "au livret (3 %)"
     st.markdown(f"Ton argent : **{ui.fcfa(state.stocks + state.cash)}** {where}.")
-    st.line_chart(pd.Series(hist, name="Valeur (F)"), height=200)
+    fig = go.Figure(go.Scatter(x=list(range(len(hist))), y=hist, name="Ton argent", line={"color": ui.ACCENT, "width": 2.4}))
+    fig.add_hline(y=ecole.START_CAPITAL, line={"color": ui.MUTED, "dash": "dot"}, name="Mise de départ", showlegend=True)
+    fig.update_layout(height=260, xaxis_title="Année", yaxis_title="FCFA", xaxis={"dtick": 1, "range": [0, len(ecole.YEARS)]})
+    st.plotly_chart(ui.with_legend(fig, -0.3), width="stretch")
     if state.year < len(ecole.YEARS):
         st.markdown(f"Que fais-tu avant l'année {state.year + 1} ?")
         cols = st.columns(len(ecole.choices_for(state)))

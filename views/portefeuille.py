@@ -113,10 +113,8 @@ with tab_pos:
                 fig.add_trace(
                     go.Scatter(x=h.index, y=h["brvmc_index"], name="BRVM Composite", line={"color": ui.AZUR, "width": 1.6})
                 )
-            fig.update_layout(
-                height=380, title="Performance base 100, versements neutralisés", legend={"orientation": "h", "y": -0.15}
-            )
-            st.plotly_chart(fig, width="stretch")
+            fig.update_layout(height=380, title="Performance base 100, versements neutralisés", yaxis_title="Base 100")
+            st.plotly_chart(ui.with_legend(fig), width="stretch")
             fig2 = go.Figure(
                 go.Scatter(
                     x=h.index,
@@ -124,11 +122,11 @@ with tab_pos:
                     fill="tozeroy",
                     fillcolor="rgba(122,166,226,.15)",
                     line={"color": ui.AZUR, "width": 1.8},
-                    name="Valeur",
+                    name="Valeur du portefeuille (titres + liquidités)",
                 )
             )
-            fig2.update_layout(height=260, title="Valeur du portefeuille (F)")
-            st.plotly_chart(fig2, width="stretch")
+            fig2.update_layout(height=280, title="Valeur du portefeuille", yaxis_title="FCFA")
+            st.plotly_chart(ui.with_legend(fig2, -0.22), width="stretch")
 
 with tab_add:
     secs = market.securities()
