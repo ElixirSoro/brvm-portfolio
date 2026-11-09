@@ -1,18 +1,18 @@
 # Versions figées (testées ensemble) : l'app en ligne et la CI installent exactement les mêmes.
 # Dependabot propose les mises à jour chaque mois ; la CI les teste avant fusion.
-streamlit==1.66.1
-pandas==3.0.5
-numpy==2.5.3
+streamlit==1.67.0
+pandas==3.1.1
+numpy==2.5.4
 scipy==1.18.1
 plotly==7.1.0
 requests==2.34.2
 beautifulsoup4==4.15.0
 feedparser==6.0.14
-anthropic==2.3.0
-python-dotenv==1.2.3
+anthropic==2.6.0
+python-dotenv==1.2.4
 openpyxl==3.1.5
 pdfplumber==0.11.10
 yfinance==1.8.0
-reportlab==5.0.1
-psycopg[binary]==3.3.6
+reportlab==5.1.0
+psycopg[binary]==3.3.8
 psycopg-pool==3.3.3
