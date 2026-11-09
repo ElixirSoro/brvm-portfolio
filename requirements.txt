@@ -1,17 +1,18 @@
-streamlit>=1.45
-pandas>=2.2
-numpy>=1.26
-scipy>=1.11
-plotly>=5.20
-requests>=2.31
-beautifulsoup4>=4.12
-feedparser>=6.0
-anthropic>=0.40
-python-dotenv>=1.0
-openpyxl>=3.1
-pdfplumber>=0.11
-yfinance>=0.2.40
-pytest>=8.0
-reportlab>=4.0
-psycopg[binary]>=3.2
-psycopg-pool>=3.2
+# Versions figées (testées ensemble) : l'app en ligne et la CI installent exactement les mêmes.
+# Dependabot propose les mises à jour chaque mois ; la CI les teste avant fusion.
+streamlit==1.66.1
+pandas==3.0.5
+numpy==2.5.3
+scipy==1.18.1
+plotly==7.1.0
+requests==2.34.2
+beautifulsoup4==4.15.0
+feedparser==6.0.14
+anthropic==2.3.0
+python-dotenv==1.2.3
+openpyxl==3.1.5
+pdfplumber==0.11.10
+yfinance==1.8.0
+reportlab==5.0.1
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
