@@ -109,19 +109,26 @@ with tab_boc:
         ok = ok.drop(outliers.index)
         if not ok.empty:
             cheap = (ok["per"] < mk["per_market"]) & (ok["yield_net"] > MIN_YIELD)
-            fig = go.Figure(
-                go.Scatter(
-                    x=ok["per"],
-                    y=ok["yield_net"],
-                    mode="markers+text",
-                    text=[t if c else "" for t, c in zip(ok.index, cheap, strict=True)],
-                    hovertext=ok.index,
-                    hovertemplate="%{hovertext}<br>PER %{x:.1f}<br>rendement %{y:.1%}<extra></extra>",
-                    textposition="top center",
-                    textfont={"family": ui.MONO, "size": 10, "color": ui.ACCENT},
-                    marker={"size": 9, "color": [ui.ACCENT if c else ui.AZUR for c in cheap]},
-                )
+            fig = go.Figure()
+            groups = (
+                (f"Moins chère que le marché et rendement > {MIN_YIELD:.0%}", cheap, ui.ACCENT),
+                ("Autres valeurs", ~cheap, ui.AZUR),
             )
+            for name, mask, color in groups:
+                part = ok[mask]
+                fig.add_trace(
+                    go.Scatter(
+                        x=part["per"],
+                        y=part["yield_net"],
+                        name=name,
+                        mode="markers+text" if color == ui.ACCENT else "markers",
+                        text=list(part.index),
+                        hovertemplate="%{text}<br>PER %{x:.1f}<br>rendement %{y:.1%}<extra></extra>",
+                        textposition="top center",
+                        textfont={"family": ui.MONO, "size": 10, "color": ui.ACCENT},
+                        marker={"size": 9, "color": color},
+                    )
+                )
             fig.add_vline(
                 x=mk["per_market"],
                 line={"color": ui.MUTED, "dash": "dot"},
@@ -133,9 +140,9 @@ with tab_boc:
                 xaxis_title="PER (cours / bénéfice par action)",
                 yaxis_title="Rendement net",
                 yaxis_tickformat=".0%",
-                title="En ambre : moins cher que le marché et plus de 5 % de rendement",
+                title="Prix (PER) et rendement net de chaque valeur",
             )
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(ui.with_legend(fig), width="stretch")
             hidden = ", ".join(outliers.index) or "aucune"
             st.caption(
                 f"Masquées (PER négatif ou au-dessus de {MAX_PER}, rendement au-dessus de {MAX_YIELD:.0%}, souvent un "

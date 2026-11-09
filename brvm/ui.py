@@ -78,6 +78,13 @@ pio.templates["elixir"] = go.layout.Template(
 pio.templates.default = "elixir"
 
 
+def with_legend(fig: go.Figure, y: float = -0.18) -> go.Figure:
+    """Légende toujours visible (même pour une seule courbe), horizontale sous le graphique (au-dessus si y >= 1)."""
+    anchor = "bottom" if y >= 1 else "top"
+    fig.update_layout(showlegend=True, legend={"orientation": "h", "x": 0, "y": y, "yanchor": anchor})
+    return fig
+
+
 @st.cache_resource(show_spinner=False)
 def _init_db() -> bool:
     """Initialise la base une seule fois par serveur et charge les dividendes si la table est vide.

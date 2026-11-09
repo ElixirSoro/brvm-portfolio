@@ -57,12 +57,15 @@ def chart(h: pd.DataFrame, title: str, with_volume: bool) -> go.Figure:
     """Courbe des clôtures et, pour une action, barres des titres échangés."""
     s = h.sort_index()
     fig = make_subplots(rows=2 if with_volume else 1, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25] if with_volume else [1])
-    fig.add_trace(go.Scatter(x=s.index, y=s["close"], name="Clôture", line={"width": 2, "color": ui.AZUR}), row=1, col=1)
+    fig.add_trace(go.Scatter(x=s.index, y=s["close"], name="Cours de clôture", line={"width": 2, "color": ui.AZUR}), row=1, col=1)
     if with_volume:
         fig.add_trace(go.Bar(x=s.index, y=s["volume"], name="Titres échangés", marker_color=ui.ACCENT, opacity=0.6), row=2, col=1)
-    fig.update_layout(height=420 if with_volume else 340, title=title, showlegend=False, bargap=0.1, separators=", ")
+    fig.update_layout(height=460 if with_volume else 380, title=title, bargap=0.1, separators=", ")
     fig.update_xaxes(tickformat="%m/%Y")
-    return fig
+    fig.update_yaxes(title_text="Cours" if not with_volume else "Cours (F)", row=1, col=1)
+    if with_volume:
+        fig.update_yaxes(title_text="Titres", row=2, col=1)
+    return ui.with_legend(fig, -0.12)
 
 
 def styled(table: pd.DataFrame, dec: int) -> Styler:

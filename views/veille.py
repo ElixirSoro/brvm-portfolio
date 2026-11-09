@@ -11,6 +11,8 @@ import streamlit as st
 from brvm import config, db, market, ui
 from brvm.bots import analyst, collector, exposures, signals
 
+NEUTRAL = 0.15  # signal de veille considéré comme neutre entre -0,15 et +0,15
+
 ui.setup(
     "Veille",
     "Ce qui peut faire bouger tes actions",
@@ -63,24 +65,34 @@ if sig.empty:
 else:
     sig = sig.sort_values("signal")
     labels = [f"{t} · {secs['name'].get(t, t)}" for t in sig.index]
-    colors = [ui.GOOD if v > 0.15 else ui.BAD if v < -0.15 else ui.MUTED for v in sig["signal"]]
-    fig = go.Figure(
-        go.Bar(
-            x=sig["signal"],
-            y=labels,
-            orientation="h",
-            marker_color=colors,
-            customdata=sig[["articles", "positives", "negatives"]].values,
-            hovertemplate="%{y}<br>signal %{x:.2f}<br>%{customdata[0]} articles · "
-            "%{customdata[1]} positifs · %{customdata[2]} négatifs<extra></extra>",
+    sig["label"] = labels
+    groups = (
+        ("Favorable", sig["signal"] > NEUTRAL, ui.GOOD),
+        ("Neutre", sig["signal"].abs() <= NEUTRAL, ui.MUTED),
+        ("Défavorable", sig["signal"] < -NEUTRAL, ui.BAD),
+    )
+    fig = go.Figure()
+    for name, mask, color in groups:
+        part = sig[mask]
+        fig.add_trace(
+            go.Bar(
+                x=part["signal"],
+                y=part["label"],
+                orientation="h",
+                name=name,
+                marker_color=color,
+                customdata=part[["articles", "positives", "negatives"]].values,
+                hovertemplate="%{y}<br>signal %{x:.2f}<br>%{customdata[0]} articles · "
+                "%{customdata[1]} positifs · %{customdata[2]} négatifs<extra></extra>",
+            )
         )
-    )
     fig.update_layout(
-        height=max(320, 22 * len(sig)),
-        xaxis={"range": [-2, 2], "title": "Défavorable ← signal → favorable"},
-        title="Vert : signal favorable, rouge : défavorable, gris : neutre",
+        height=max(340, 22 * len(sig)),
+        xaxis={"range": [-2, 2], "title": "Défavorable ← signal de veille → favorable"},
+        yaxis={"categoryorder": "array", "categoryarray": labels},
+        title="Signal de veille par valeur",
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(ui.with_legend(fig, 1.02), width="stretch")
 
 # ---------------- fil ----------------
 ui.section("Fil", "Les articles et leur impact")
@@ -153,8 +165,8 @@ else:
                 line={"width": 2.4 if i == 0 else 1.6},
             )
         )
-    fig.update_layout(height=380, title="Base 100 au début de la période", legend={"orientation": "h", "y": -0.15})
-    st.plotly_chart(fig, width="stretch")
+    fig.update_layout(height=380, title="Évolution des indicateurs", yaxis_title="Base 100 au début de la période")
+    st.plotly_chart(ui.with_legend(fig), width="stretch")
     last = wide.ffill().iloc[-1]
     chg = wide.ffill().iloc[-1] / wide.bfill().iloc[0] - 1
     st.dataframe(
