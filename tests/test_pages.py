@@ -73,3 +73,14 @@ def test_premiers_pas_level_saves_and_unlocks() -> None:
     assert db.get_setting(ecole.PROGRESS_SETTING)["crise"] == 3
     assert any("Investisseur averti" in m.value for m in at.markdown)
     db.set_setting(ecole.PROGRESS_SETTING, {})
+
+
+@pytest.mark.parametrize("google", [False, True])
+def test_login_page_offers_google_when_configured(google: bool) -> None:
+    at = AppTest.from_file(str(ROOT / "views" / "connexion.py"), default_timeout=TIMEOUT_S)
+    if google:
+        at.secrets["auth"] = {"redirect_uri": "http://localhost:8501/oauth2callback", "cookie_secret": "x" * 32}
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    labels = [b.label for b in at.button]
+    assert ("Se connecter avec Google" in labels) is google

@@ -159,13 +159,40 @@ def colored(x: float, text: str | None = None) -> str:
 
 
 SESSION_USER = "user"
+GOOGLE_ERROR = "google_error"
+
+
+def google_enabled() -> bool:
+    """Vrai si la connexion Google est configurée (section [auth] des Secrets Streamlit)."""
+    try:
+        return "auth" in st.secrets
+    except FileNotFoundError:  # aucun fichier de secrets (tests, poste local)
+        return False
+
+
+def google_signed_in() -> bool:
+    """Vrai si la personne s'est identifiée auprès de Google dans ce navigateur (cookie Streamlit, 30 jours)."""
+    return google_enabled() and bool(st.user.is_logged_in)
+
+
+def _from_google() -> auth.User | None:
+    """Compte de l'application lié à l'identité Google du navigateur ; None (erreur notée) en cas de refus."""
+    email, verified = str(st.user.get("email") or ""), bool(st.user.get("email_verified"))
+    try:
+        user = auth.google_user(email, verified)
+    except auth.AuthError as e:
+        st.session_state[GOOGLE_ERROR] = str(e)
+        return None
+    st.session_state.pop(GOOGLE_ERROR, None)
+    remember(user)
+    return user
 
 
 def current_user() -> auth.User | None:
-    """Utilisateur connecté dans cette session du navigateur, ou None."""
+    """Utilisateur connecté dans cette session du navigateur (e-mail et mot de passe, ou Google), ou None."""
     data = st.session_state.get(SESSION_USER)
     if not isinstance(data, dict):
-        return None
+        return _from_google() if auth.enabled() and google_signed_in() else None
     user = auth.User(str(data["id"]), str(data["email"]))
     if not auth.is_active(user.id):  # compte supprimé ou suspendu depuis la connexion : session fermée
         st.session_state.pop(SESSION_USER, None)
@@ -203,6 +230,8 @@ def account_box() -> None:
         if st.button("Se déconnecter", icon=":material/logout:"):
             st.session_state.pop(SESSION_USER, None)
             st.cache_data.clear()
+            if google_signed_in():
+                st.logout()  # efface aussi le cookie Google, sinon la session se rouvrirait aussitôt
             st.rerun()
 
 

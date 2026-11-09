@@ -12,6 +12,16 @@ ui.setup(
     "que par toi. Les cours, les documents officiels et la veille sont communs à tous.",
 )
 
+if ui.google_enabled():
+    error = st.session_state.get(ui.GOOGLE_ERROR)
+    if error and ui.google_signed_in():
+        st.error(error)
+        st.button("Utiliser un autre compte Google", on_click=st.logout, icon=":material/switch_account:")
+    else:
+        st.button("Se connecter avec Google", on_click=st.login, type="primary", icon=":material/account_circle:")
+        st.caption("Tu restes connecté 30 jours sur ce navigateur. Même adresse que ton compte : données conservées.")
+    st.markdown('<p class="elx-sub" style="margin:16px 0 0">ou avec ton e-mail</p>', unsafe_allow_html=True)
+
 tab_in, tab_up = st.tabs(["Se connecter", "Créer un compte"])
 
 with tab_in, st.form("connexion"):

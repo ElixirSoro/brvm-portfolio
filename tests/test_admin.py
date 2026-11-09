@@ -97,3 +97,8 @@ def test_admin_page_runs_for_an_admin(users):
     at.switch_page("views/administration.py").run()
     assert not at.exception, [e.value for e in at.exception]
     assert "Créer un mot de passe provisoire" in [b.label for b in at.button]
+
+
+def test_find_by_email_ignores_case(users):
+    assert auth.find_by_email(" BOB@example.com ") == users
+    assert auth.find_by_email("inconnu@example.com") is None

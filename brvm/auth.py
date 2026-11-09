@@ -4,6 +4,8 @@ Contrat
 - Actif seulement pour la version en ligne (base PostgreSQL) ; en local (SQLite), propriétaire « local », sans compte.
 - sign_up(email, mot de passe) → User, ou None si Supabase exige une confirmation par e-mail.
 - sign_in(email, mot de passe) → User ; AuthError (message en français) si refusé ou injoignable.
+- google_user(email, vérifié) → User : compte Supabase de cette adresse, créé s'il n'existe pas (connexion
+  Google gérée par Streamlit, st.login) ; AuthError si l'adresse n'est pas vérifiée ou le compte suspendu.
 - Propriétaire courant : défini à chaque exécution de page par set_owner(), lu par owner() ; les portefeuilles
   et les réglages personnels (frais, IRVM) sont rangés par propriétaire.
 """
@@ -11,6 +13,7 @@ Contrat
 from __future__ import annotations
 
 import re
+import secrets
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
@@ -179,3 +182,34 @@ def sign_up(email: str, password: str) -> User | None:
     if not payload.get("access_token"):
         return None
     return _user(payload)
+
+
+def find_by_email(email: str) -> User | None:
+    """Compte Supabase de cette adresse (suspendu ou non), ou None ; la casse de l'adresse est ignorée."""
+    address = email.strip().lower()
+    if not address or len(address) > MAX_FIELD:
+        raise ValueError("adresse e-mail invalide")
+    row = db.df("SELECT id::text AS id, email FROM auth.users WHERE lower(email) = ? ORDER BY created_at LIMIT 1", (address,))
+    if row.empty:
+        return None
+    return User(str(row["id"].iloc[0]), str(row["email"].iloc[0]))
+
+
+def google_user(email: str, verified: bool) -> User:
+    """Compte lié à une connexion Google : celui de la même adresse s'il existe (données conservées), sinon créé.
+
+    Le compte créé reçoit un mot de passe aléatoire jamais montré : la personne se connecte avec Google, ou
+    choisit un mot de passe plus tard (réinitialisation par l'administrateur).
+    """
+    address = email.strip().lower()
+    if not verified or not EMAIL.match(address) or len(address) > MAX_FIELD:
+        raise AuthError("Adresse Google non vérifiée : utilise un autre compte ou ton e-mail et ton mot de passe.")
+    user = find_by_email(address)
+    if user is None:
+        sign_up(address, secrets.token_urlsafe(24) + "aZ9")  # lettres et chiffres garantis
+        user = find_by_email(address)
+    if user is None:
+        raise AuthError("Création du compte impossible pour le moment : réessaie dans un instant.")
+    if not is_active(user.id):
+        raise AuthError(MESSAGES["banned"])
+    return user

@@ -104,3 +104,25 @@ def test_other_account_cannot_read_value_or_edit_operations(as_owner):
             attempt()
     as_owner("carla")
     assert len(portfolio.transactions(pid)) == 1
+
+
+def test_google_user_reuses_or_creates_account(monkeypatch):
+    known = {"elixir@example.com": auth.User("u-1", "Elixir@Example.com")}
+    created = []
+
+    def fake_sign_up(email, password):
+        assert len(password) >= auth.MIN_PASSWORD
+        created.append(email)
+        known[email] = auth.User("u-2", email)
+
+    monkeypatch.setattr(auth, "find_by_email", lambda e: known.get(e.strip().lower()))
+    monkeypatch.setattr(auth, "sign_up", fake_sign_up)
+    monkeypatch.setattr(auth, "is_active", lambda uid: uid != "u-banni")
+    assert auth.google_user(" ELIXIR@example.com", True).id == "u-1"  # même adresse : même compte, données gardées
+    assert auth.google_user("nouveau@example.com", True).id == "u-2" and created == ["nouveau@example.com"]
+    with pytest.raises(auth.AuthError, match="non vérifiée"):
+        auth.google_user("autre@example.com", False)
+    known["banni@example.com"] = auth.User("u-banni", "banni@example.com")
+    with pytest.raises(auth.AuthError, match="suspendu"):
+        auth.google_user("banni@example.com", True)
+    assert created == ["nouveau@example.com"]

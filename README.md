@@ -93,6 +93,20 @@ ses propres portefeuilles, opérations et grille de frais ; les cours, documents
 communs. Seuls les administrateurs (`ADMIN_EMAILS`) peuvent mettre à jour ces données communes. En local
 (base SQLite), il n'y a pas de compte.
 
+**Connexion Google** (facultative) : si les Secrets Streamlit contiennent une section `[auth]`, la page Connexion
+affiche « Se connecter avec Google » (`st.login`) ; la session reste ouverte 30 jours sur le navigateur. L'adresse
+Google, vérifiée, est rattachée au compte Supabase de la même adresse (données conservées), ou un compte est créé.
+Les comptes e-mail et mot de passe restent possibles. Secrets à ajouter :
+
+```toml
+[auth]
+redirect_uri = "https://brvm-portfolio-soro.streamlit.app/oauth2callback"
+cookie_secret = "…longue chaîne aléatoire…"
+client_id = "….apps.googleusercontent.com"
+client_secret = "…"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+```
+
 **Administration** (page visible des seuls administrateurs) : liste des comptes avec leur activité (nombre de
 portefeuilles et d'opérations, jamais leur contenu), mot de passe provisoire en cas d'oubli, suspension et
 réactivation (la session en cours est coupée), suppression définitive d'un compte et de toutes ses données,
