@@ -200,3 +200,15 @@ def test_bootstrap_draw_and_required_monthly():
     assert reached >= 0.7
     below = simulation.simulate(replace(plan, monthly=need * 0.95), model, 500)["prob_goal"]
     assert below < 0.7
+
+
+def test_signal_tilt_cannot_cross_mu_bounds():
+    """Les bornes −5 % / 25 % s'appliquent après l'inclinaison par la veille, même au curseur maximal."""
+    params = {"min_daily_value": 0, "shrinkage": 1.0, "price_prior": 0.30, "signal_tilt": 0.05}
+    base = optimizer.estimate({k: v for k, v in params.items() if k != "signal_tilt"})
+    assert np.allclose(base.mu, optimizer.MU_BOUNDS[1])  # tous au plafond
+    up = optimizer.estimate(params, signals=pd.Series(2.0, index=base.tickers))
+    assert up.mu.max() <= optimizer.MU_BOUNDS[1] + 1e-12
+    low = {**params, "price_prior": -0.30}
+    down = optimizer.estimate(low, signals=pd.Series(-2.0, index=base.tickers))
+    assert down.mu.min() >= optimizer.MU_BOUNDS[0] - 1e-12
