@@ -111,6 +111,36 @@ une base PostgreSQL Supabase (projet `brvm-portfolio`, us-east-1).
 - **Après chaque mise à jour du code** (fusion dans `main`) : share.streamlit.io › ⋮ › **Reboot**. Le rechargement
   à chaud est désactivé (`.streamlit/config.toml`) : il mélangeait anciennes et nouvelles versions des modules.
 
+## Automatisation (GitHub Actions)
+
+Trois tâches tournent sur GitHub, gratuitement (dépôt public), sans dépendre du Mac :
+
+| Tâche | Quand (heure GMT = Abidjan) | Ce qu'elle fait |
+| --- | --- | --- |
+| **Tests** | À chaque modification (push, pull request) | ruff, format, mypy, règles NASA, tests sur SQLite puis PostgreSQL 17 |
+| **Bots** | Lun.-ven. 17 h 37 ; tous les jours 7 h 23 et 12 h 23 ; dimanche 5 h 41 | Cours et BOC après la séance ; veille et indicateurs ; liste des rapports le dimanche |
+| **Sauvegarde** | Lundi 2 h 13 | Export de la base (portefeuilles, opérations, comptes), chiffré AES-256, conservé 90 jours |
+
+Chaque passage des bots sollicite la base : le projet Supabase gratuit ne se met plus en pause
+(il s'arrête après 7 jours sans activité). Les tâches se lancent aussi à la main : onglet **Actions** › tâche ›
+**Run workflow**.
+
+**Secrets à créer une fois** (Settings › Secrets and variables › Actions › New repository secret) :
+
+- `DATABASE_URL` : la même adresse que dans les secrets Streamlit ;
+- `BACKUP_PASSPHRASE` : une phrase de passe longue, à garder hors de GitHub (sans elle, la sauvegarde est illisible) ;
+- `ANTHROPIC_API_KEY` (facultatif) : analyse des actualités par l'IA plutôt que par mots-clés.
+
+## Sauvegardes
+
+Le dépôt est public, donc ses artefacts aussi : chaque sauvegarde est chiffrée avant d'être déposée.
+Pour restaurer :
+
+1. Actions › **Sauvegarde** › la dernière exécution réussie › télécharger l'artefact `sauvegarde-brvm` et le dézipper.
+2. Déchiffrer : `gpg -d brvm-AAAA-MM-JJ.sql.gz.gpg | gunzip > brvm.sql` (la phrase de passe est demandée).
+3. Recharger dans une base vide (nouveau projet Supabase, ou base locale) : `psql "<adresse>" -f brvm.sql`.
+   Le message « schema public already exists » est normal.
+
 ## Fiabilité du code
 
 Le code suit les règles NASA/JPL « Power of 10 » adaptées à Python (skill `code-fiable-nasa`) :

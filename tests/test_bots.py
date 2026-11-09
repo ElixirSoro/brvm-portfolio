@@ -94,3 +94,19 @@ def test_alias_matching_uses_word_boundaries():
     )
     assert "SNTS" in r["impacts"]
     assert "ONTBF" not in r["impacts"] and "SEMC" not in r["impacts"]
+
+
+def test_run_refuses_local_base_when_postgres_required(monkeypatch):
+    """Planifiés sur GitHub, les bots ne doivent jamais écrire dans une base SQLite jetable."""
+    import sys
+
+    import pytest
+
+    from brvm import db
+    from brvm.bots import run
+
+    if db.engine() == "postgres":
+        pytest.skip("la base de test est PostgreSQL")
+    monkeypatch.setattr(sys, "argv", ["run", "--require-postgres", "--no-quotes"])
+    with pytest.raises(SystemExit, match="DATABASE_URL"):
+        run.main()

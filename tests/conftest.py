@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+from urllib.parse import urlparse
 from pathlib import Path
 
 import numpy as np
@@ -37,8 +38,23 @@ def _synthetic_prices(seed: int = 7) -> list[tuple]:
     return rows
 
 
+def _reset_test_postgres() -> None:
+    """Base PostgreSQL de test vidée avant la suite : chaque exécution repart de zéro.
+
+    Garde-fou : on ne vide qu'une base dont le nom contient « test » (jamais la base de production).
+    """
+    url = os.environ["DATABASE_URL"]
+    if not url:
+        return
+    name = urlparse(url).path.lstrip("/")
+    assert "test" in name, f"TEST_DATABASE_URL doit viser une base de test (reçu « {name} »)"
+    for table in db.TABLES:
+        db.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def seeded_db():
+    _reset_test_postgres()
     db.init()
     db.executemany("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?,?,?)", _synthetic_prices())
     loader.load_dividends()
