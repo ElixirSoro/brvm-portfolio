@@ -1,6 +1,7 @@
 # Versions figées (testées ensemble) : l'app en ligne et la CI installent exactement les mêmes.
 # Dependabot propose les mises à jour chaque mois ; la CI les teste avant fusion.
 streamlit==1.67.0
+Authlib==1.9.5  # connexion Google (st.login)
 pandas==3.1.1
 numpy==2.5.4
 scipy==1.18.1
