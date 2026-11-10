@@ -53,6 +53,58 @@ h1 {{ font-weight: 800 !important; }}
 .elx-chip {{ font-family: '{MONO}', monospace; font-size: 12px; padding: 2px 8px; border-radius: 6px;
             background: rgba(240,180,41,.12); color: {PAPER}; margin-right: 4px; }}
 .elx-metric {{ font-size: clamp(20px, 2.1vw + 12px, 28px); overflow-wrap: anywhere; }}
+.elx-card {{ transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }}
+.elx-card:hover {{ transform: translateY(-2px); border-color: #35506e; box-shadow: 0 10px 28px rgba(0,0,0,.28); }}
+.elx-hello {{ display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap;
+             margin-bottom: 6px; }}
+.elx-hello h1 {{ font-size: clamp(28px, 2.4vw + 14px, 40px); margin: 0; padding: 4px 0 0; }}
+.elx-hello .elx-label {{ margin: 0; }}
+.elx-pill {{ display: inline-flex; align-items: center; gap: 9px; border: 1px solid {LINE}; background: {SURFACE_ALT};
+            border-radius: 999px; padding: 8px 14px; font-size: 13px; color: {BODY}; }}
+.elx-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {GOOD}; animation: elx-pulse 2s infinite; }}
+.elx-dot.off {{ background: {MUTED}; animation: none; }}
+@keyframes elx-pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(95,185,138,.55); }} 70% {{ box-shadow: 0 0 0 9px rgba(95,185,138,0); }}
+                       100% {{ box-shadow: 0 0 0 0 rgba(95,185,138,0); }} }}
+.elx-hero {{ background: linear-gradient(140deg, #1f3352 0%, {SURFACE} 60%); height: auto; }}
+.elx-ttl {{ display: flex; align-items: center; gap: 7px; font-size: 13px; color: {MUTED}; }}
+.elx-big {{ font-family: '{MONO}', monospace; font-weight: 700; font-size: clamp(30px, 3vw + 14px, 46px); color: {PAPER};
+           line-height: 1.15; margin-top: 6px; }}
+.elx-spark {{ display: block; margin-top: 12px; }}
+.elx-chips {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }}
+.elx-chipbox {{ background: {SURFACE_ALT}; border: 1px solid {LINE}; border-radius: 12px; padding: 8px 12px; font-size: 12px;
+               color: {MUTED}; }}
+.elx-chipbox b {{ display: block; font-family: '{MONO}', monospace; font-size: 14px; color: {PAPER}; margin-top: 2px; }}
+.elx-stat {{ height: auto; margin-bottom: 14px; }}
+.elx-val {{ font-family: '{MONO}', monospace; font-weight: 700; font-size: 28px; color: {PAPER}; margin-top: 4px; }}
+.elx-val small {{ font-size: 15px; margin-left: 8px; }}
+.elx-note {{ font-size: 12px; color: {MUTED}; margin-top: 8px; }}
+.elx-gauge {{ height: 10px; background: {LINE}; border-radius: 999px; overflow: hidden; margin-top: 10px; }}
+.elx-gauge div {{ height: 100%; background: {ACCENT}; border-radius: 999px; transition: width .6s ease; }}
+.elx-mv {{ display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid {LINE}; }}
+.elx-mv:last-child {{ border-bottom: 0; }}
+.elx-tk {{ flex: 0 0 62px; text-align: center; font-family: '{MONO}', monospace; font-size: 13px; font-weight: 700;
+          color: {PAPER}; background: {SURFACE_ALT}; border: 1px solid {LINE}; border-radius: 8px; padding: 4px 0; }}
+.elx-nm {{ flex: 1; min-width: 0; font-size: 14px; color: {BODY}; overflow: hidden; text-overflow: ellipsis;
+          white-space: nowrap; }}
+.elx-nm small {{ display: block; font-family: '{MONO}', monospace; font-size: 12px; color: {MUTED}; }}
+.elx-track {{ flex: 0 0 22%; height: 6px; border-radius: 999px; background: {SURFACE_ALT}; overflow: hidden; }}
+.elx-track span {{ display: block; height: 100%; border-radius: 999px; }}
+.elx-pc {{ flex: 0 0 74px; text-align: right; font-family: '{MONO}', monospace; font-size: 14px; font-weight: 700; }}
+.st-key-raccourcis [data-testid="stPageLink"] a {{ background: {SURFACE_ALT}; border: 1px solid {LINE}; border-radius: 16px;
+    padding: 14px 16px; width: 100%; transition: transform .18s ease, border-color .18s ease, background .18s ease; }}
+.st-key-raccourcis [data-testid="stPageLink"] a:hover {{ transform: translateY(-2px); border-color: {ACCENT};
+    background: {SURFACE}; }}
+.st-key-raccourcis [data-testid="stPageLink"] a p {{ font-weight: 600; color: {PAPER}; font-size: 15px; }}
+.st-key-raccourcis [data-testid="stPageLink"] a span[data-testid="stIconMaterial"] {{ color: {ACCENT}; font-size: 22px; }}
+.st-key-parcours {{ background: linear-gradient(120deg, rgba(240,180,41,.16), rgba(122,166,226,.08));
+    border: 1px solid rgba(240,180,41,.45); border-radius: 18px; padding: 16px 22px; }}
+.elx-list {{ height: auto; padding: 8px 20px; }}
+.elx-list .elx-news:last-child {{ border-bottom: 0; }}
+.elx-news a {{ color: {PAPER}; text-decoration: none; font-weight: 600; line-height: 1.35; }}
+.elx-news a:hover {{ color: {ACCENT}; }}
+.elx-quest {{ display: flex; align-items: center; gap: 16px; }}
+.elx-quest b {{ font-family: '{DISP}', sans-serif; font-size: 19px; color: {PAPER}; display: block; }}
+.elx-quest span {{ font-size: 14px; color: {BODY}; }}
 @media (max-width: 640px) {{ .elx-card {{ margin-bottom: 10px; padding: 14px 16px; }} }}
 </style>
 """
@@ -112,10 +164,15 @@ def _init_db() -> bool:
     return True
 
 
-def setup(label: str, title: str, intro: str | None = None) -> None:
-    """En-tête de page à la charte (surtitre, titre, introduction) et barre latérale."""
+def styles() -> None:
+    """Prépare la page (base, feuille de style) sans en-tête : pour les pages qui composent le leur."""
     _init_db()
     st.markdown(CSS, unsafe_allow_html=True)
+
+
+def setup(label: str, title: str, intro: str | None = None) -> None:
+    """En-tête de page à la charte (surtitre, titre, introduction) et barre latérale."""
+    styles()
     st.markdown(f'<p class="elx-label">{label}</p>', unsafe_allow_html=True)
     st.title(title)
     if intro:
