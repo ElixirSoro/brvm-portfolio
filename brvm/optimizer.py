@@ -4,7 +4,8 @@ max  U(w) = μᵀw − (λ/2)·wᵀΣw
 s.c. Σw = 1, 0 ≤ w_i ≤ max_weight, Σ_secteur w ≤ max_sector
 
 μ : rendement de cours historique rétréci vers la moyenne du marché + rendement en dividende net
-Σ : covariance hebdomadaire rétrécie vers une corrélation constante (Ledoit-Wolf 2003), annualisée
+Σ : covariance hebdomadaire rétrécie vers une corrélation constante, avec l'intensité optimale de
+    Ledoit & Wolf (2004, « Honey, I Shrunk the Sample Covariance Matrix »), annualisée
 Un actif « Obligations » (rendement fixe, faible volatilité) est ajouté : λ fixe naturellement la part prudente.
 """
 
@@ -35,26 +36,62 @@ FRONTIER_LAMBDAS = (0.8, 60.0)
 MAX_FRONTIER_POINTS = 100
 
 
-def shrunk_cov(x: np.ndarray, intensity: float = 0.3) -> np.ndarray:
-    """Covariance rétrécie vers une cible à corrélation constante (Ledoit & Wolf, 2003).
+def _corr_target(s: np.ndarray) -> tuple[np.ndarray, float]:
+    """Cible à corrélation constante d'une covariance `s`, et corrélation moyenne utilisée."""
+    n = s.shape[0]
+    sd = np.sqrt(np.diag(s))
+    corr = s / np.outer(sd, sd)
+    rbar = float((corr.sum() - n) / (n * (n - 1))) if n > 1 else 0.0
+    target = rbar * np.outer(sd, sd)
+    np.fill_diagonal(target, sd**2)
+    return target, rbar
 
-    La cible garde la corrélation moyenne du marché : un portefeuille diversifié n'est pas
-    supposé sans risque (ce que ferait un rétrécissement vers l'identité).
-    x : T x N rendements.
+
+def lw_intensity(x: np.ndarray) -> float:
+    """Intensité optimale δ* du rétrécissement vers la corrélation constante (Ledoit & Wolf, 2004, annexe B).
+
+    δ* = max(0, min(1, (π − ρ) / (γ·T))) : π mesure le bruit de la covariance empirique, ρ la covariance entre
+    les erreurs de la cible et de l'empirique, γ l'écart entre les deux matrices. Peu de dates ou une cible
+    proche de l'empirique → δ* élevé. x : T x N rendements, sans valeur manquante ni série constante.
     """
     if x.ndim != 2 or x.shape[0] < 2:
         raise ValueError("matrice T x N de rendements attendue, au moins 2 dates")
-    if not 0 <= intensity <= 1:
-        raise ValueError(f"intensité de rétrécissement entre 0 et 1 (reçu {intensity})")
     x = x - x.mean(axis=0)
     t, n = x.shape
-    s = x.T @ x / max(t - 1, 1)
-    sd = np.sqrt(np.diag(s))
-    corr = s / np.outer(sd, sd)
-    rbar = (corr.sum() - n) / (n * (n - 1)) if n > 1 else 0.0
-    target = rbar * np.outer(sd, sd)
-    np.fill_diagonal(target, sd**2)
-    return np.asarray(intensity * target + (1 - intensity) * s, dtype=float)
+    if n < 2:
+        return 0.0
+    s = x.T @ x / t
+    target, rbar = _corr_target(s)
+    gamma = float(((target - s) ** 2).sum())
+    if gamma <= 0:
+        return 1.0  # la cible et l'empirique coïncident : le choix est indifférent
+    pi_mat = (x**2).T @ (x**2) / t - s**2
+    var = np.diag(s)
+    theta = (x**3).T @ x / t - var[:, None] * s  # theta[i, j] = cov(x_i², x_i·x_j)
+    sd = np.sqrt(var)
+    off = ~np.eye(n, dtype=bool)
+    rho = float(np.diag(pi_mat).sum() + rbar * ((sd[None, :] / sd[:, None]) * theta)[off].sum())
+    delta = float(np.clip((float(pi_mat.sum()) - rho) / gamma / t, 0.0, 1.0))
+    assert 0.0 <= delta <= 1.0
+    return delta
+
+
+def shrunk_cov(x: np.ndarray, intensity: float | None = None) -> np.ndarray:
+    """Covariance rétrécie vers une cible à corrélation constante (Ledoit & Wolf, 2004).
+
+    La cible garde la corrélation moyenne du marché : un portefeuille diversifié n'est pas
+    supposé sans risque (ce que ferait un rétrécissement vers l'identité).
+    x : T x N rendements. intensity : poids de la cible entre 0 et 1 ; None = intensité optimale (lw_intensity).
+    """
+    if x.ndim != 2 or x.shape[0] < 2:
+        raise ValueError("matrice T x N de rendements attendue, au moins 2 dates")
+    delta = lw_intensity(x) if intensity is None else intensity
+    if not 0 <= delta <= 1:
+        raise ValueError(f"intensité de rétrécissement entre 0 et 1 (reçu {delta})")
+    x = x - x.mean(axis=0)
+    s = x.T @ x / max(x.shape[0] - 1, 1)
+    target, _ = _corr_target(s)
+    return np.asarray(delta * target + (1 - delta) * s, dtype=float)
 
 
 @dataclass
@@ -66,6 +103,7 @@ class Inputs:
     prices: pd.Series
     yields: pd.Series
     excluded: dict[str, Any] = field(default_factory=dict[str, Any])
+    cov_shrinkage: float = 0.0  # intensité δ* du rétrécissement de la covariance (information)
 
 
 def estimate(
@@ -114,10 +152,11 @@ def estimate(
         mu = mu + p["signal_tilt"] * sig / 2
     mu = mu.clip(*MU_BOUNDS)  # bornes appliquées en dernier : la veille ne peut pas les franchir
     assert ((mu >= MU_BOUNDS[0]) & (mu <= MU_BOUNDS[1])).all()
-    cov = pd.DataFrame(shrunk_cov(r.values) * WEEKS_PER_YEAR, index=keep, columns=keep)
+    delta = lw_intensity(r.to_numpy(dtype=float)) if p.get("cov_shrinkage") is None else float(p["cov_shrinkage"])
+    cov = pd.DataFrame(shrunk_cov(r.to_numpy(dtype=float), delta) * WEEKS_PER_YEAR, index=keep, columns=keep)
     assert np.isfinite(mu).all() and np.isfinite(cov.values).all()
     secs = market.securities()
-    return Inputs(keep, mu, cov, secs["sector"].reindex(keep), q["last"].reindex(keep), y, excluded)
+    return Inputs(keep, mu, cov, secs["sector"].reindex(keep), q["last"].reindex(keep), y, excluded, delta)
 
 
 def _with_bond(inp: Inputs, p: dict[str, Any]) -> tuple[list[str], np.ndarray, np.ndarray, pd.Series]:

@@ -243,3 +243,46 @@ def test_history_ohlc_frequencies_and_split_adjustment():
     finally:
         db.execute("DELETE FROM prices WHERE ticker = 'HIST'")
         db.execute("DELETE FROM corporate_actions WHERE ticker = 'HIST'")
+
+
+def test_ledoit_wolf_intensity_adapts_to_sample_size():
+    """δ* : entre 0 et 1, plus fort avec peu de dates, et la covariance rétrécie est plus proche de la vraie."""
+    rng = np.random.default_rng(0)
+    n = 30
+    load = rng.normal(size=(n, 4))
+    true_cov = load @ load.T + np.diag(rng.uniform(1, 3, n))
+    short = rng.multivariate_normal(np.zeros(n), true_cov, size=60)
+    long = rng.multivariate_normal(np.zeros(n), true_cov, size=5000)
+    d_short, d_long = optimizer.lw_intensity(short), optimizer.lw_intensity(long)
+    assert 0 <= d_long < d_short <= 1 and d_long < 0.02
+    err_raw = np.linalg.norm(np.cov(short.T) - true_cov)
+    assert np.linalg.norm(optimizer.shrunk_cov(short) - true_cov) < err_raw
+    assert np.allclose(optimizer.shrunk_cov(short, 0.0), np.cov(short.T))  # δ = 0 : covariance empirique
+    assert optimizer.lw_intensity(short[:, :1]) == 0.0  # un seul titre : rien à rétrécir
+    with pytest.raises(ValueError):
+        optimizer.shrunk_cov(short, 1.5)
+
+
+def test_external_text_is_escaped_and_links_are_http_only():
+    from brvm import ui
+
+    assert ui.esc('<img src=x onerror="alert(1)">') == "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;"
+    assert ui.esc(None) == ""
+    assert ui.safe_url("https://exemple.com/a?b=1&c=2") == "https://exemple.com/a?b=1&amp;c=2"
+    assert ui.safe_url("javascript:alert(1)") == "#" and ui.safe_url(None) == "#" and ui.safe_url("data:text/html,x") == "#"
+
+
+def test_account_status_is_rechecked_at_most_once_a_minute(monkeypatch):
+    import streamlit as st
+
+    from brvm import auth, ui
+
+    calls = []
+    monkeypatch.setattr(auth, "is_active", lambda uid: calls.append(uid) or True)
+    monkeypatch.setattr(ui.st, "session_state", {})
+    ui.remember(auth.User("u-1", "a@b.co"))
+    assert ui.current_user() == auth.User("u-1", "a@b.co") and ui.current_user() is not None
+    assert calls == ["u-1"]  # la seconde lecture n'interroge pas la base
+    st.session_state[ui.SESSION_USER]["checked"] -= ui.ACTIVE_CHECK_S + 1
+    monkeypatch.setattr(auth, "is_active", lambda uid: False)
+    assert ui.current_user() is None and ui.SESSION_USER not in st.session_state  # suspendu : session fermée

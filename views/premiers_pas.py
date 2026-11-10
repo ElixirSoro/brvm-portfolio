@@ -116,6 +116,7 @@ def level_basket() -> int | None:
         picks = st.multiselect(
             "Ton panier (5 entreprises)",
             names,
+            placeholder="Choisis 5 entreprises",
             max_selections=ecole.BASKET_SIZE,
             format_func=lambda n: f"{n} · {ecole.COMPANIES[n]}",
         )

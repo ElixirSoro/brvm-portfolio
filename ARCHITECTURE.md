@@ -1,8 +1,8 @@
 # BRVM Portfolio — cadrage
 
-Version 0.2 · 29 octobre 2026 · Elixir
+Version 0.3 · 10 novembre 2026 · Elixir
 
-Un logiciel local qui répond à quatre questions : **quel portefeuille BRVM pour mon niveau de risque**, **où peut-il m'amener**, **où en est mon vrai portefeuille, frais compris**, et **qu'est-ce qui, dans le monde, peut faire bouger mes actions**.
+Un logiciel (en ligne sur Streamlit Community Cloud, ou en local sur le Mac) qui répond à quatre questions : **quel portefeuille BRVM pour mon niveau de risque**, **où peut-il m'amener**, **où en est mon vrai portefeuille, frais compris**, et **qu'est-ce qui, dans le monde, peut faire bouger mes actions**.
 
 ## 1. Modules
 
@@ -14,9 +14,12 @@ Un logiciel local qui répond à quatre questions : **quel portefeuille BRVM pou
 | Portefeuille virtuel | Copie du portefeuille réel : achats, ventes, dépôts, dividendes nets d'IRVM, frais SGI/BRVM/DC-BR/TVA, droits de garde ; valorisation au cours du jour ; performance vs BRVM Composite | `brvm/portfolio.py`, `brvm/fees.py` |
 | Veille (bots) | Collecte d'actualités et d'indicateurs (CI, Afrique, monde), analyse par IA, score d'impact par action | `brvm/bots/` |
 | Documents officiels | Lecture des BOC (cours officiels, PER, rendement, indices, communiqués, AG) et des états financiers des sociétés cotées ; extraction des grands postes par règles ou par IA | `brvm/data/boc.py`, `brvm/data/reports.py`, `brvm/analysis/financials.py`, `brvm/documents.py` |
+| Comptes | En ligne : compte par e-mail et mot de passe (Supabase Auth) ou connexion Google (`st.login`) ; données personnelles cloisonnées par propriétaire ; page Administration | `brvm/auth.py`, `brvm/admin.py`, `views/connexion.py` |
+| École | Vidéos commentées et parcours-jeu en 7 niveaux « Mes premiers pas en bourse » | `brvm/ecole.py`, `views/premiers_pas.py` |
+| Automatisation | GitHub Actions : tests à chaque modification, bots planifiés, sauvegarde chiffrée hebdomadaire | `.github/workflows/` |
 | Interface | Application Streamlit dans le navigateur | `app.py`, `views/` |
 
-Stockage : une base SQLite (`data/brvm.db`) — rien ne sort de ton ordinateur, sauf les textes envoyés à l'API Claude pour l'analyse.
+Stockage : en local, une base SQLite (`data/brvm.db`) ; en ligne, une base PostgreSQL Supabase (variable `DATABASE_URL`). Seuls les textes d'actualité sont envoyés à l'API Claude pour l'analyse.
 
 ## 2. Données : d'où elles viennent, et leurs limites
 
@@ -37,7 +40,7 @@ Stockage : une base SQLite (`data/brvm.db`) — rien ne sort de ton ordinateur, 
 
 - Rendements : log-rendements hebdomadaires sur 5 ans par défaut (la BRVM cote peu certains titres : le journalier est trop bruité), annualisés.
 - Rendement espéré : rendement de cours historique **rétréci** (75 % par défaut) vers une hausse de long terme supposée de 5 % par an, plus le rendement en dividende net courant. Sans ce rétrécissement, l'optimiseur extrapolerait les années exceptionnelles 2024-2026 et se jetterait sur les titres qui ont le plus monté.
-- Risque : covariance rétrécie vers une corrélation constante (Ledoit-Wolf 2003) : plus stable avec 48 titres, sans faire croire qu'un portefeuille diversifié est sans risque.
+- Risque : covariance rétrécie vers une corrélation constante, avec l'intensité optimale δ* de Ledoit-Wolf (2004) recalculée à chaque estimation : plus stable avec 48 titres, sans faire croire qu'un portefeuille diversifié est sans risque.
 - Objectif : maximiser `U = μᵀw − (λ/2) wᵀΣw` avec λ issu du questionnaire (1 = audacieux … 10 = très prudent).
 - Contraintes : pas de vente à découvert, 15 % maximum par ligne, 40 % par secteur, liquidité minimale (volume moyen), part d'obligations selon le profil.
 - Sorties : poids, quantités entières au cours du jour pour un capital donné, frais d'achat, frontière efficiente avec la position du portefeuille.
@@ -77,6 +80,7 @@ Sans clé API, les bots continuent de collecter et appliquent un score par mots-
 | --- | --- |
 | 0.1 (ce prototype) | Les 5 modules fonctionnels, données Sika, SQLite, bots RSS + IA, interface Streamlit |
 | 0.2 (fait) | Lecture automatique des BOC et des états financiers ; mise en conformité « code fiable » |
-| 0.2.1 | Alertes e-mail/WhatsApp sur signal fort |
-| 0.3 | Obligations cotées dans l'optimiseur, Black-Litterman avec les signaux des bots comme « vues » |
-| 0.4 | Backtest des stratégies (rééquilibrage annuel vs achat-conservation), export PDF du suivi |
+| 0.3 (fait) | Version en ligne avec comptes et connexion Google ; bots et sauvegardes automatiques ; « Premiers pas en bourse » ; page Historique des cours ; covariance à intensité optimale de Ledoit-Wolf |
+| 0.3.1 | Alertes e-mail/WhatsApp sur signal fort |
+| 0.4 | Obligations cotées dans l'optimiseur, Black-Litterman avec les signaux des bots comme « vues » |
+| 0.5 | Backtest des stratégies (rééquilibrage annuel vs achat-conservation), export PDF du suivi |

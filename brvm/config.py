@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -50,7 +51,7 @@ DEFAULT_FEES = {
 DEFAULT_IRVM = {"ci": 12.0, "sn": 10.0, "bf": 12.5, "ml": 10.0, "ne": 10.0, "bj": 10.0, "tg": 13.0, "gw": 10.0}
 
 # Optimiseur
-DEFAULT_OPTIM = {
+DEFAULT_OPTIM: dict[str, Any] = {
     "max_weight": 0.15,
     "max_sector": 0.40,
     "min_weight": 0.02,
@@ -60,4 +61,5 @@ DEFAULT_OPTIM = {
     "min_daily_value": 1_000_000,  # FCFA échangés en moyenne par jour (filtre de liquidité)
     "shrinkage": 0.75,  # poids donné au rendement de long terme face à l'historique récent
     "price_prior": 0.05,  # rendement de cours annuel de long terme supposé (hors dividendes)
+    "cov_shrinkage": None,  # rétrécissement de la covariance : None = intensité optimale de Ledoit-Wolf
 }

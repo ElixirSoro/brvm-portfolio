@@ -293,6 +293,10 @@ st.caption(
     "les poids sont choisis avec les données de cette même période, le passé paraît donc meilleur qu'il ne l'était."
 )
 
+st.caption(
+    f"Risque estimé sur {len(inp.tickers)} valeurs ; covariance rapprochée à {ui.pct(inp.cov_shrinkage, 0)} d'une corrélation "
+    "commune (intensité optimale de Ledoit-Wolf) pour limiter le bruit de l'historique."
+)
 if inp.excluded:
     with st.expander(f"{len(inp.excluded)} titres écartés par les filtres"):
         st.dataframe(pd.Series(inp.excluded, name="Raison"), width="stretch")

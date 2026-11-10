@@ -110,7 +110,7 @@ server_metadata_url = "https://accounts.google.com/.well-known/openid-configurat
 
 **Administration** (page visible des seuls administrateurs) : liste des comptes avec leur activité (nombre de
 portefeuilles et d'opérations, jamais leur contenu), mot de passe provisoire en cas d'oubli, suspension et
-réactivation (la session en cours est coupée), suppression définitive d'un compte et de toutes ses données,
+réactivation (la session en cours est coupée en moins d'une minute), suppression définitive d'un compte et de toutes ses données,
 nomination d'autres administrateurs. On ne peut ni se suspendre, ni se supprimer, ni se retirer ses propres droits ;
 les adresses de `ADMIN_EMAILS` restent administrateurs en permanence.
 
