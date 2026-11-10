@@ -25,6 +25,71 @@ PAPER, BODY, MUTED, ACCENT, AZUR = "#E8EDF3", "#C9D6E4", "#8CA0B8", "#F0B429", "
 GOOD, BAD = "#5FB98A", "#E07A6B"
 DISP, SANS, MONO = "Bricolage Grotesque", "Instrument Sans", "JetBrains Mono"
 
+# Animations (motion design) : apparition en cascade, courbes qui se tracent, barres qui grandissent, survols.
+# « backwards » : une fois l'animation finie, l'élément reprend son style normal (les survols restent actifs).
+# Tout est coupé pour les personnes qui ont demandé moins d'animations (prefers-reduced-motion).
+EASE = "cubic-bezier(.2,.7,.2,1)"
+MOTION = f"""
+@keyframes elx-rise {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
+@keyframes elx-fade {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+@keyframes elx-draw {{ from {{ clip-path: inset(0 100% 0 0); }} to {{ clip-path: inset(0 0 0 0); }} }}
+@keyframes elx-grow {{ from {{ transform: scaleX(0); }} to {{ transform: scaleX(1); }} }}
+@keyframes elx-pop {{ 0% {{ opacity: 0; transform: scale(.94); }} 60% {{ transform: scale(1.02); }}
+                     100% {{ opacity: 1; transform: none; }} }}
+@keyframes elx-float {{ 0%, 100% {{ transform: translateY(0) rotate(0); }} 50% {{ transform: translateY(-4px) rotate(-4deg); }} }}
+@keyframes elx-sheen {{ from {{ background-position: 0% 0%; }} to {{ background-position: 100% 100%; }} }}
+.elx-label, [data-testid="stHeading"] {{ animation: elx-rise .5s {EASE} backwards; }}
+.elx-hello {{ animation: elx-rise .55s {EASE} backwards; }}
+.elx-pill {{ animation: elx-pop .5s {EASE} .15s backwards; }}
+.elx-card {{ animation: elx-rise .55s {EASE} .05s backwards; }}
+.elx-stat {{ animation-delay: .14s; }}
+.elx-list {{ animation-delay: .2s; }}
+[data-testid="stColumn"]:nth-child(2) .elx-card {{ animation-delay: .12s; }}
+[data-testid="stColumn"]:nth-child(3) .elx-card {{ animation-delay: .19s; }}
+[data-testid="stColumn"]:nth-child(4) .elx-card {{ animation-delay: .26s; }}
+[data-testid="stColumn"]:nth-child(5) .elx-card {{ animation-delay: .33s; }}
+.elx-hero {{ background-size: 180% 180%;
+    animation: elx-rise .55s {EASE} backwards, elx-sheen 9s ease-in-out 1s infinite alternate; }}
+.elx-big, .elx-val, .elx-metric {{ animation: elx-pop .6s {EASE} .2s backwards; }}
+.elx-spark {{ animation: elx-draw 1.3s {EASE} .3s backwards; }}
+.elx-gauge div, .elx-track span {{ transform-origin: left center; animation: elx-grow .9s {EASE} .35s backwards; }}
+.elx-chipbox {{ animation: elx-rise .45s {EASE} .45s backwards; }}
+.elx-chipbox:nth-child(2) {{ animation-delay: .52s; }} .elx-chipbox:nth-child(3) {{ animation-delay: .59s; }}
+.elx-chipbox:nth-child(4) {{ animation-delay: .66s; }}
+.elx-mv, .elx-news {{ animation: elx-rise .45s {EASE} .3s backwards; }}
+.elx-mv:nth-child(2), .elx-news:nth-child(2) {{ animation-delay: .36s; }}
+.elx-mv:nth-child(3), .elx-news:nth-child(3) {{ animation-delay: .42s; }}
+.elx-mv:nth-child(4), .elx-news:nth-child(4) {{ animation-delay: .48s; }}
+.elx-mv:nth-child(5), .elx-news:nth-child(5) {{ animation-delay: .54s; }}
+.elx-mv:nth-child(n+6), .elx-news:nth-child(n+6) {{ animation-delay: .6s; }}
+.elx-mv {{ transition: background .15s ease, padding .15s ease; border-radius: 8px; }}
+.elx-mv:hover {{ background: rgba(122,166,226,.07); padding-left: 6px; padding-right: 6px; }}
+.elx-chip {{ transition: transform .15s ease; display: inline-block; }}
+.elx-chip:hover {{ transform: translateY(-1px) scale(1.04); }}
+.st-key-raccourcis [data-testid="stColumn"] {{ animation: elx-rise .5s {EASE} .25s backwards; }}
+.st-key-raccourcis [data-testid="stColumn"]:nth-child(2) {{ animation-delay: .32s; }}
+.st-key-raccourcis [data-testid="stColumn"]:nth-child(3) {{ animation-delay: .39s; }}
+.st-key-raccourcis [data-testid="stColumn"]:nth-child(4) {{ animation-delay: .46s; }}
+.st-key-raccourcis [data-testid="stPageLink"] a span[data-testid="stIconMaterial"] {{ transition: transform .2s {EASE}; }}
+.st-key-raccourcis [data-testid="stPageLink"] a:hover span[data-testid="stIconMaterial"] {{
+    transform: scale(1.18) rotate(-6deg); }}
+.st-key-parcours {{ animation: elx-rise .6s {EASE} .4s backwards; }}
+.elx-quest svg {{ animation: elx-float 3.2s ease-in-out infinite; }}
+[data-testid="stPlotlyChart"], [data-testid="stDataFrame"], [data-testid="stExpander"], [data-testid="stForm"],
+[data-testid="stAlert"], [data-testid="stVideo"] {{ animation: elx-rise .55s {EASE} .1s backwards; }}
+.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {{
+    transition: transform .15s {EASE}, box-shadow .15s ease, border-color .15s ease; }}
+.stButton > button:hover, .stDownloadButton > button:hover, .stFormSubmitButton > button:hover {{
+    transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.28); }}
+.stButton > button:active, .stDownloadButton > button:active, .stFormSubmitButton > button:active {{ transform: scale(.97); }}
+[data-testid="stSidebarNavLink"] {{ transition: padding-left .18s {EASE}, background .18s ease; }}
+[data-testid="stSidebarNavLink"]:hover {{ padding-left: 14px; }}
+[data-testid="stSidebarNavLink"] span[data-testid="stIconMaterial"] {{ transition: transform .2s {EASE}; }}
+[data-testid="stSidebarNavLink"]:hover span[data-testid="stIconMaterial"] {{ transform: scale(1.15); }}
+@media (prefers-reduced-motion: reduce) {{
+    *, *::before, *::after {{ animation: none !important; transition: none !important; }} }}
+"""
+
 CSS = f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -106,6 +171,7 @@ h1 {{ font-weight: 800 !important; }}
 .elx-quest b {{ font-family: '{DISP}', sans-serif; font-size: 19px; color: {PAPER}; display: block; }}
 .elx-quest span {{ font-size: 14px; color: {BODY}; }}
 @media (max-width: 640px) {{ .elx-card {{ margin-bottom: 10px; padding: 14px 16px; }} }}
+{MOTION}
 </style>
 """
 
