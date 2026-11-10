@@ -7,3 +7,4 @@ data/sources_rss.txt
 data/documents/
 .mypy_cache/
 .ruff_cache/
+.coverage
