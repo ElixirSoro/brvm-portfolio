@@ -25,7 +25,8 @@ def test_page_runs_without_exception(page: str) -> None:
     at = _app()
     at.switch_page(f"views/{page}").run()
     assert not at.exception, f"{page} : {[e.value for e in at.exception]}"
-    assert at.title, f"{page} : aucun titre affiché"
+    titled = bool(at.title) or any("<h1>" in m.value for m in at.markdown)  # l'accueil compose son propre en-tête
+    assert titled, f"{page} : aucun titre affiché"
 
 
 @pytest.mark.skipif(LOCAL, reason="comptes actifs seulement avec PostgreSQL")

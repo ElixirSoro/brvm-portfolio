@@ -20,6 +20,16 @@ VIDEOS = (
 CRISIS_KEY, HISTORY_KEY, DONE_KEY = "ecole_crise", "ecole_crise_hist", "ecole_crise_fin"
 
 
+RIGHT, WRONG = ":green[:material/check_circle:]", ":red[:material/cancel:]"
+
+
+def stars_label(earned: int) -> str:
+    """Étoiles gagnées en ambre, étoiles manquantes en gris (pictogrammes, sans emoji)."""
+    if not 0 <= earned <= ecole.MAX_STARS:
+        raise ValueError(f"étoiles entre 0 et {ecole.MAX_STARS} (reçu {earned})")
+    return ":orange[:material/star:]" * earned + ":gray[:material/star:]" * (ecole.MAX_STARS - earned)
+
+
 def load_progress() -> dict[str, int]:
     """Progression de la personne connectée (meilleures étoiles par niveau)."""
     return ecole.clean_progress(auth.get_user_setting(ecole.PROGRESS_SETTING, {}))
@@ -32,7 +42,7 @@ def save(progress: dict[str, int], key: str, earned: int) -> dict[str, int]:
         auth.set_user_setting(ecole.PROGRESS_SETTING, new)
     except db.SAVE_ERRORS as e:
         st.error(f"Progression non enregistrée : {db.redact(str(e))}")
-    label = "⭐" * earned + "☆" * (ecole.MAX_STARS - earned)
+    label = stars_label(earned)
     if earned == ecole.MAX_STARS:
         st.success(f"{label} Parfait ! Niveau réussi.")
         st.balloons()
@@ -44,10 +54,10 @@ def save(progress: dict[str, int], key: str, earned: int) -> dict[str, int]:
 
 
 def show_corrections(labels: list[str], ok: list[bool], extra: list[str] | None = None) -> None:
-    """Liste des réponses avec ✅ / ❌ et, si fourni, l'explication de chaque ligne."""
+    """Liste des réponses avec une coche verte ou une croix rouge et, si fourni, l'explication de chaque ligne."""
     for i, (label, good) in enumerate(zip(labels, ok, strict=True)):
         note = f" — {extra[i]}" if extra else ""
-        st.markdown(f"{'✅' if good else '❌'} {label}{note}")
+        st.markdown(f"{RIGHT if good else WRONG} {label}{note}")
 
 
 def level_money() -> int | None:
@@ -206,7 +216,7 @@ def show_levels(progress: dict[str, int]) -> dict[str, int]:
     for i, lv in enumerate(ecole.LEVELS):
         earned = progress.get(lv.key)
         unlocked = i == 0 or ecole.LEVELS[i - 1].key in progress
-        mark = "⭐" * earned + "☆" * (ecole.MAX_STARS - earned) if earned is not None else ("🔓" if unlocked else "🔒")
+        mark = stars_label(earned) if earned is not None else (":material/lock_open:" if unlocked else ":material/lock:")
         with st.expander(f"Niveau {i + 1} · {lv.title}   {mark}", icon=lv.icon, expanded=unlocked and earned is None):
             if not unlocked:
                 st.caption("Termine le niveau précédent pour débloquer celui-ci.")
@@ -232,7 +242,7 @@ st.warning(
 tab_videos, tab_game = st.tabs(["Vidéos", "Le parcours"])
 
 with tab_videos:
-    st.caption("Awa, ta guide, t'explique tout en quatre courtes vidéos. Active le son 🔊")
+    st.caption("Awa, ta guide, t'explique tout en quatre courtes vidéos. Active le son :material/volume_up:")
     for file, title, summary in VIDEOS:
         ui.section("En vidéo", title)
         st.caption(summary)
