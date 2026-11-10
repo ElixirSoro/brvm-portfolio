@@ -180,7 +180,7 @@ def show_quest() -> None:
     stars, best = sum(progress.values()), len(ecole.LEVELS) * ecole.MAX_STARS
     verb = "Commence" if not progress else "Continue"
     with st.container(key="parcours"):
-        left, right = st.columns([5, 1], vertical_alignment="center")
+        left, right = st.columns([4, 1.3], vertical_alignment="center")
         left.markdown(
             f'<div class="elx-quest">{home.icon("rocket", 34)}<div><b>{verb} ton parcours : niveau {number} '
             f"« {home.esc(level.title)} »</b><span>{len(progress)} sur {len(ecole.LEVELS)} niveaux terminés · "

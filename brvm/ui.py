@@ -168,6 +168,13 @@ h1 {{ font-weight: 800 !important; }}
 .elx-news a {{ color: {PAPER}; text-decoration: none; font-weight: 600; line-height: 1.35; }}
 .elx-news a:hover {{ color: {ACCENT}; }}
 .elx-quest {{ display: flex; align-items: center; gap: 16px; }}
+.elx-quest svg {{ flex: 0 0 auto; }}
+.st-key-parcours [data-testid="stColumn"]:last-child {{ flex: 0 0 auto; width: auto; min-width: 150px; }}
+.st-key-parcours [data-testid="stPageLink"] a {{ background: {ACCENT}; border-radius: 999px; padding: 9px 18px;
+    justify-content: center; width: 100%; transition: transform .15s ease, box-shadow .15s ease; }}
+.st-key-parcours [data-testid="stPageLink"] a:hover {{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.3); }}
+.st-key-parcours [data-testid="stPageLink"] a p {{ color: {INK}; font-weight: 600; white-space: nowrap; overflow: visible; }}
+.st-key-parcours [data-testid="stPageLink"] a span[data-testid="stIconMaterial"] {{ color: {INK}; }}
 .elx-quest b {{ font-family: '{DISP}', sans-serif; font-size: 19px; color: {PAPER}; display: block; }}
 .elx-quest span {{ font-size: 14px; color: {BODY}; }}
 @media (max-width: 640px) {{ .elx-card {{ margin-bottom: 10px; padding: 14px 16px; }} }}
