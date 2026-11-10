@@ -3,7 +3,7 @@
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction.
 import streamlit as st
 
-from brvm import auth, ui
+from brvm import auth, config, ui
 
 ui.setup(
     "Connexion",
@@ -21,6 +21,18 @@ if ui.google_enabled():
         st.button("Se connecter avec Google", on_click=st.login, type="primary", icon=":material/account_circle:")
         st.caption("Tu restes connecté 30 jours sur ce navigateur. Même adresse que ton compte : données conservées.")
     st.markdown('<p class="elx-sub" style="margin:16px 0 0">ou avec ton e-mail</p>', unsafe_allow_html=True)
+
+PRIVACY = """
+- **Ce qui est enregistré** : ton adresse e-mail, tes portefeuilles, tes opérations, ta grille de frais et ta
+  progression dans « Premiers pas ». Avec Google, seule ton adresse e-mail vérifiée est lue : ni tes contacts,
+  ni tes messages, ni ton mot de passe.
+- **Qui les voit** : toi seul. L'administrateur voit la liste des comptes et le nombre de portefeuilles et
+  d'opérations, jamais leur contenu.
+- **Où** : dans une base Supabase protégée ; rien n'est vendu ni partagé, aucune publicité, aucun traceur.
+- **Supprimer ton compte** et toutes tes données : écris à l'administrateur ({admin}).
+- **Rappel** : Mr investor est un outil d'aide à la décision, pas un conseil en investissement. Aucun argent
+  réel ne passe par l'application.
+"""
 
 tab_in, tab_up = st.tabs(["Se connecter", "Créer un compte"])
 
@@ -54,3 +66,6 @@ with tab_up, st.form("inscription"):
                     st.rerun()
             except auth.AuthError as e:
                 st.error(str(e))
+
+with st.expander("Confidentialité et données personnelles", icon=":material/shield_person:"):
+    st.markdown(PRIVACY.format(admin=", ".join(sorted(config.ADMIN_EMAILS))))

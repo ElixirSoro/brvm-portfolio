@@ -1,6 +1,6 @@
 [project]
 name = "brvm-portfolio"
-version = "0.2.0"
+version = "0.3.0"
 description = "Portefeuille BRVM selon l'aversion au risque, simulations, portefeuille virtuel, veille et documents officiels"
 requires-python = ">=3.12"
 

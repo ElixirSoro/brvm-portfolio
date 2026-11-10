@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import html
+import time
+from urllib.parse import urlparse
+
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -12,7 +16,7 @@ from pathlib import Path
 from . import auth, db
 
 APP_NAME = "Mr investor"
-VERSION = "0.2"
+VERSION = "0.3"
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 LOGO = ASSETS / "logo-mr-investor.svg"
 
@@ -48,6 +52,8 @@ h1 {{ font-weight: 800 !important; }}
 .elx-news .meta {{ font-family: '{MONO}', monospace; font-size: 12px; color: {MUTED}; }}
 .elx-chip {{ font-family: '{MONO}', monospace; font-size: 12px; padding: 2px 8px; border-radius: 6px;
             background: rgba(240,180,41,.12); color: {PAPER}; margin-right: 4px; }}
+.elx-metric {{ font-size: clamp(20px, 2.1vw + 12px, 28px); overflow-wrap: anywhere; }}
+@media (max-width: 640px) {{ .elx-card {{ margin-bottom: 10px; padding: 14px 16px; }} }}
 </style>
 """
 
@@ -165,8 +171,33 @@ def colored(x: float, text: str | None = None) -> str:
     return f'<span class="{cls}">{text or pct(x, signed=True)}</span>'
 
 
+def esc(text: object) -> str:
+    """Texte venu de l'extérieur (flux RSS, sites) rendu inoffensif avant insertion dans du HTML."""
+    return html.escape(str(text if text is not None else ""), quote=True)
+
+
+def safe_url(url: object) -> str:
+    """Adresse http(s) échappée pour un attribut href ; « # » pour toute autre forme (javascript:, data:…)."""
+    raw = str(url or "").strip()
+    return esc(raw) if urlparse(raw).scheme in ("http", "https") else "#"
+
+
+def news_card(meta: str, url: object, title: object, detail: object, extra: str = "") -> None:
+    """Article de veille : ligne d'informations (HTML sûr fourni par l'appelant), titre cliquable, résumé.
+
+    Le titre, le résumé et l'adresse viennent de sites tiers : ils sont échappés ici.
+    """
+    st.markdown(
+        f'<div class="elx-news"><div class="meta">{meta}</div>'
+        f'<a href="{safe_url(url)}" target="_blank" rel="noopener noreferrer">{esc(title)}</a><br>'
+        f'<span class="elx-sub">{esc(detail)}</span>{extra}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 SESSION_USER = "user"
 GOOGLE_ERROR = "google_error"
+ACTIVE_CHECK_S = 60.0  # un compte suspendu ou supprimé est déconnecté au plus tard après ce délai
 
 
 def google_enabled() -> bool:
@@ -201,9 +232,15 @@ def current_user() -> auth.User | None:
     if not isinstance(data, dict):
         return _from_google() if auth.enabled() and google_signed_in() else None
     user = auth.User(str(data["id"]), str(data["email"]))
+    checked = data.get("checked")
+    if (
+        isinstance(checked, float) and time.monotonic() - checked < ACTIVE_CHECK_S
+    ):  # déjà vérifié à l'instant : pas de nouvelle requête
+        return user
     if not auth.is_active(user.id):  # compte supprimé ou suspendu depuis la connexion : session fermée
         st.session_state.pop(SESSION_USER, None)
         return None
+    data["checked"] = time.monotonic()
     return user
 
 
@@ -233,7 +270,7 @@ def account_box() -> None:
         return
     with st.sidebar:
         role = " · administrateur" if user.is_admin else ""
-        st.markdown(f'<p class="elx-sub">Connecté : {user.email}{role}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="elx-sub">Connecté : {esc(user.email)}{role}</p>', unsafe_allow_html=True)
         if st.button("Se déconnecter", icon=":material/logout:"):
             st.session_state.pop(SESSION_USER, None)
             st.cache_data.clear()

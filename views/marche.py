@@ -26,8 +26,8 @@ sig = signals.ticker_signals()
 stocks["signal"] = sig["signal"].reindex(stocks.index) if not sig.empty else None
 
 f1, f2, f3 = st.columns([2, 2, 1])
-sectors = f1.multiselect("Secteurs", sorted(stocks["sector"].unique()))
-countries = f2.multiselect("Pays", sorted(stocks["country"].unique()))
+sectors = f1.multiselect("Secteurs", sorted(stocks["sector"].unique()), placeholder="Tous")
+countries = f2.multiselect("Pays", sorted(stocks["country"].unique()), placeholder="Tous")
 min_yield = f3.number_input("Rendement mini (%)", 0.0, 15.0, 0.0, 0.5)
 view = stocks
 if sectors:
@@ -88,7 +88,7 @@ if pick in panel:
         )
     fig.update_layout(
         height=380,
-        title=f"{stocks.loc[pick, 'name']} — cours ajusté des fractionnements",
+        title=f"{pick} · cours ajusté des fractionnements",
         yaxis_title="FCFA",
     )
     st.plotly_chart(ui.with_legend(fig), width="stretch")
@@ -101,8 +101,5 @@ if not imp.empty:
         badge = ui.colored(r["score"], score_txt)
         when = r["published"].strftime("%d/%m/%Y") if hasattr(r["published"], "strftime") else ""
         detail = r["summary"] or r["rationale"] or ""
-        st.markdown(
-            f'<div class="elx-news"><div class="meta">{when} · {r["source"]} · {r["category"] or ""} · impact {badge}</div>'
-            f'<a href="{r["url"]}" target="_blank">{r["title"]}</a><br><span class="elx-sub">{detail}</span></div>',
-            unsafe_allow_html=True,
-        )
+        meta = f"{when} · {ui.esc(r['source'])} · {ui.esc(r['category'] or '')} · impact {badge}"
+        ui.news_card(meta, r["url"], r["title"], detail)

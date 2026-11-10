@@ -99,9 +99,9 @@ ui.section("Fil", "Les articles et leur impact")
 imp = signals.impacts(days)
 news = db.df("SELECT * FROM news WHERE published >= ? ORDER BY published DESC", (signals.cutoff_iso(days),))
 f1, f2, f3, f4 = st.columns(4)
-scope = f1.multiselect("Portée", sorted([s for s in news["scope"].dropna().unique() if s]))
-cat = f2.multiselect("Catégorie", ["endogène", "exogène"])
-tick = f3.multiselect("Action", list(secs.index), format_func=lambda t: f"{t} · {secs['name'].get(t, t)}")
+scope = f1.multiselect("Portée", sorted([s for s in news["scope"].dropna().unique() if s]), placeholder="Toutes")
+cat = f2.multiselect("Catégorie", ["endogène", "exogène"], placeholder="Toutes")
+tick = f3.multiselect("Action", list(secs.index), format_func=lambda t: f"{t} · {secs['name'].get(t, t)}", placeholder="Toutes")
 only_impact = f4.toggle("Seulement avec impact", True)
 
 if not news.empty:
@@ -120,7 +120,7 @@ if not news.empty:
             continue
         chips = (
             " ".join(
-                f'<span class="elx-chip">{r.ticker} {ui.colored(cast(float, r.score), f"{r.score:+.0f}")}</span>'
+                f'<span class="elx-chip">{ui.esc(r.ticker)} {ui.colored(cast(float, r.score), f"{r.score:+.0f}")}</span>'
                 for r in rows.itertuples()
             )
             if not rows.empty
@@ -129,13 +129,8 @@ if not news.empty:
         when = str(n["published"])[:10]
         th = n["theme"] or ""
         theme = exposures.FACTORS.get(th, {}).get("label") or (f"Société {th.split(':')[1]}" if th.startswith("societe:") else th)
-        st.markdown(
-            f'<div class="elx-news"><div class="meta">{when} · {n["source"]} · {n["scope"] or ""} · '
-            f"{n['category'] or ''} · {theme}</div>"
-            f'<a href="{n["url"]}" target="_blank">{n["title"]}</a><br>'
-            f'<span class="elx-sub">{n["summary"] or ""}</span><div style="margin-top:6px">{chips}</div></div>',
-            unsafe_allow_html=True,
-        )
+        meta = " · ".join(ui.esc(x or "") for x in (when, n["source"], n["scope"], n["category"], theme))
+        ui.news_card(meta, n["url"], n["title"], n["summary"], f'<div style="margin-top:6px">{chips}</div>')
         shown += 1
         if shown >= 60:
             st.caption("60 premiers articles affichés : affine les filtres pour voir les autres.")
@@ -153,7 +148,12 @@ else:
     wide = fac.pivot(index="date", columns="code", values="value").sort_index()
     period = st.select_slider("Période des indicateurs", [3, 6, 12, 24, 60], 12, format_func=lambda m: f"{m} mois")
     wide = wide[wide.index >= wide.index.max() - pd.DateOffset(months=period)]
-    pick = st.multiselect("Indicateurs", list(wide.columns), default=[c for c in ["petrole", "cacao", "sucre"] if c in wide])
+    pick = st.multiselect(
+        "Indicateurs",
+        list(wide.columns),
+        placeholder="Choisis des indicateurs",
+        default=[c for c in ["petrole", "cacao", "sucre"] if c in wide],
+    )
     fig = go.Figure()
     for i, c in enumerate(pick):
         sr = wide[c].dropna()
