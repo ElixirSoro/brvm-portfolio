@@ -122,7 +122,7 @@ def badge(progress: dict[str, int]) -> tuple[str, str]:
     total = sum(progress.values())
     done = sum(1 for k in LEVEL_KEYS if k in progress)
     if done < len(LEVELS):
-        return "Apprenti investisseur", f"{done} niveau(x) sur {len(LEVELS)} terminés."
+        return "Apprenti investisseur", f"{done} sur {len(LEVELS)} niveaux terminés."
     if total >= len(LEVELS) * MAX_STARS - 2:
         return "Investisseur averti", "Tu connais les règles du jeu. Passe à ton vrai profil de risque !"
     return "Investisseur en herbe", "Parcours terminé. Rejoue les niveaux à moins de 3 étoiles pour progresser."
