@@ -183,8 +183,8 @@ def show_quest() -> None:
         left, right = st.columns([5, 1], vertical_alignment="center")
         left.markdown(
             f'<div class="elx-quest">{home.icon("rocket", 34)}<div><b>{verb} ton parcours : niveau {number} '
-            f"« {home.esc(level.title)} »</b><span>{len(progress)} niveau(x) sur {len(ecole.LEVELS)} terminés · "
-            f"{stars} étoile(s) sur {best}</span></div></div>",
+            f"« {home.esc(level.title)} »</b><span>{len(progress)} sur {len(ecole.LEVELS)} niveaux terminés · "
+            f"{stars} sur {best} étoiles</span></div></div>",
             unsafe_allow_html=True,
         )
         right.page_link("views/premiers_pas.py", label="Reprendre" if progress else "Commencer", icon=":material/play_arrow:")
