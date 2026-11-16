@@ -167,6 +167,9 @@ h1 {{ font-weight: 800 !important; }}
 .elx-list .elx-news:last-child {{ border-bottom: 0; }}
 .elx-news a {{ color: {PAPER}; text-decoration: none; font-weight: 600; line-height: 1.35; }}
 .elx-news a:hover {{ color: {ACCENT}; }}
+@media (max-width: 640px) {{ .st-key-objectifs [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; }}
+    .st-key-objectifs [data-testid="stColumn"]:first-child {{ flex: 1 1 100%; min-width: 100%; }}
+    .st-key-objectifs [data-testid="stColumn"]:not(:first-child) {{ flex: 1 1 0; min-width: 0; width: auto; }} }}
 .elx-quest {{ display: flex; align-items: center; gap: 16px; }}
 .elx-quest svg {{ flex: 0 0 auto; }}
 .st-key-parcours [data-testid="stColumn"]:last-child {{ flex: 0 0 auto; width: auto; min-width: 150px; }}
