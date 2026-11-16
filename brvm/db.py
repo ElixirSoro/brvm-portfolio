@@ -102,10 +102,18 @@ TABLES: dict[str, Table] = {
     "events": Table(_cols("date text, ticker text, kind text, title text, source text"), ("date", "ticker", "kind", "title")),
     "reports": Table(_cols("url text, ticker text, title text, kind text, period text, published text, analyzed flag, "
                            "method text, note text"), ("url",)),
+    "goals": Table(_cols("id id, owner text, week text, kind text, title text, target real, unit text, status text, "
+                         "created created"), ("id",)),
+    "daily_notes": Table(_cols("id id, owner text, date text, headline text, body text, source text, created created"),
+                         ("id",)),
     "financials": Table(_cols("ticker text, period text, metric text, current real, previous real, method text, "
                               "confidence text, url text"), ("ticker", "period", "metric")),
 }  # fmt: skip
-INDEXES = ("CREATE INDEX IF NOT EXISTS idx_news_fp ON news(fingerprint)",)
+INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_news_fp ON news(fingerprint)",
+    "CREATE INDEX IF NOT EXISTS idx_goals_owner_week ON goals(owner, week)",
+    "CREATE INDEX IF NOT EXISTS idx_notes_owner_date ON daily_notes(owner, date)",
+)
 # évolutions de schéma des bases déjà créées (idempotentes) : portefeuilles rangés par propriétaire
 MIGRATIONS = {
     "postgres": (

@@ -15,6 +15,7 @@ PAGES = [
     st.Page("views/optimiseur.py", title="Profil et optimiseur", icon=":material/tune:"),
     st.Page("views/simulations.py", title="Simulations", icon=":material/insights:"),
     st.Page("views/portefeuille.py", title="Mon portefeuille", icon=":material/account_balance_wallet:"),
+    st.Page("views/objectifs.py", title="Objectifs et note du jour", icon=":material/flag:"),
     st.Page("views/veille.py", title="Veille", icon=":material/radar:"),
     st.Page("views/documents.py", title="Documents officiels", icon=":material/description:"),
     st.Page("views/reglages.py", title="Réglages", icon=":material/settings:"),

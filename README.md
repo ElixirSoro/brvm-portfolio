@@ -18,6 +18,7 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 | Profil et optimiseur | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
 | Simulations | Monte-Carlo sur 1 à 30 ans : fourchette des résultats, probabilité d'atteindre l'objectif, versement nécessaire |
 | Mon portefeuille | Copie virtuelle du portefeuille réel : opérations, frais, dividendes nets d'IRVM, droits de garde, performance vs BRVM Composite |
+| Objectifs et note du jour | Objectifs de la semaine (actions à mener ou objectifs chiffrés) et note quotidienne rédigée par Claude via le connecteur Supabase (tâche planifiée du compte Claude, sans clé API) : veille, actualité, portefeuille, ajustements à étudier |
 | Documents officiels | Lecture des Bulletins Officiels de la Cote (cours officiels, PER, rendements, indices, communiqués, assemblées générales) et des états financiers publiés par les sociétés sur brvm.org |
 | Veille | Bots qui collectent l'actualité (CI, UEMOA, Afrique, monde) et notent l'impact par action ; matières premières, change, taux |
 | Réglages | Import de l'historique, grille de frais SGI, IRVM, calendrier des dividendes, clé IA, flux RSS |

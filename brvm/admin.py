@@ -97,6 +97,8 @@ def delete_account(actor: auth.User, user_id: str) -> None:
         con.execute("DELETE FROM transactions WHERE portfolio_id IN (SELECT id FROM portfolios WHERE owner = ?)", (uid,))
         con.execute("DELETE FROM portfolios WHERE owner = ?", (uid,))
         con.execute("DELETE FROM settings WHERE key LIKE ?", (f"{uid}/%",))
+        con.execute("DELETE FROM goals WHERE owner = ?", (uid,))
+        con.execute("DELETE FROM daily_notes WHERE owner = ?", (uid,))
         if con.execute("DELETE FROM auth.users WHERE id::text = ?", (uid,)).rowcount != 1:
             raise ValueError(f"compte {uid} introuvable")
 

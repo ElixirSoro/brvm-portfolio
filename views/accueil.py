@@ -2,13 +2,13 @@
 
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # la logique est dans le paquet brvm (home, market, portfolio), la page ne fait qu'afficher.
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 
-from brvm import auth, db, ecole, home, market, portfolio, ui
+from brvm import auth, db, ecole, goals, home, market, portfolio, ui
 from brvm.bots import signals
 from brvm.data import quotes as quotes_src
 
@@ -170,6 +170,28 @@ def show_news() -> None:
     st.page_link("views/veille.py", label="Toute la veille", icon=":material/arrow_forward:")
 
 
+def show_coach() -> None:
+    """Objectifs de la semaine et dernière note de Claude, avec un lien vers la page dédiée."""
+    week = goals.list_week(goals.week_start(date.today()))
+    reached, kept = goals.progress(week)
+    latest = goals.notes(1)
+    if not kept and latest.empty:
+        return
+    ui.section("Cap", "Mes objectifs et la note du jour")
+    left, right = st.columns([1, 2])
+    done = f"{reached} / {kept}" if kept else "—"
+    note = "objectifs atteints cette semaine" if kept else "Aucun objectif fixé cette semaine."
+    left.markdown(home.stat_card("target", "Objectifs de la semaine", done, note, home.gauge(reached / kept if kept else 0.0)),
+                  unsafe_allow_html=True)  # fmt: skip
+    with right, st.container(border=True):
+        if latest.empty:
+            st.caption("Pas encore de note : Claude l'écrit chaque soir de séance.")
+        else:
+            st.markdown(f"**{latest.iloc[0]['headline']}**")
+            st.caption(f"Note du {date.fromisoformat(str(latest.iloc[0]['date'])[:10]):%d/%m/%Y}")
+        st.page_link("views/objectifs.py", label="Voir mes objectifs et la note complète", icon=":material/arrow_forward:")
+
+
 def show_quest() -> None:
     """Bandeau du parcours « Premiers pas » tant qu'il reste un niveau à terminer."""
     progress = ecole.clean_progress(auth.get_user_setting(ecole.PROGRESS_SETTING, {}))
@@ -233,6 +255,7 @@ with right_col:
     ui.section("Veille", "Ce que les bots ont repéré")
     show_news()
 
+show_coach()
 show_quest()
 
 if len(my_ports) > 1:
