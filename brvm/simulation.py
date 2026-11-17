@@ -22,6 +22,7 @@ class Plan:
     buy_fee_rate: float | None = None  # frais d'achat en % du montant investi ; None = grille actuelle
     custody_rate: float | None = None  # droits de garde annuels
     group_months: int = 3  # versements regroupés en un ordre tous les n mois
+    inflation: float = 0.0  # hausse annuelle des prix : sert aux montants « en francs d'aujourd'hui »
 
 
 def _fee_rates(plan: Plan) -> tuple[float, float]:
@@ -44,6 +45,7 @@ SEARCH_GROW_STEPS = 40
 SEARCH_BISECT_STEPS = 30
 SEARCH_GROWTH = 1.5
 MIN_MONTHLY_GUESS = 1000.0
+MAX_INFLATION = 0.5
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ def _check(plan: Plan, model: Returns, n_paths: int) -> None:
         raise ValueError(f"nombre de trajectoires entre 1 et {MAX_PATHS} (reçu {n_paths})")
     if model.method not in ("normal", "bootstrap"):
         raise ValueError(f"méthode inconnue : {model.method}")
+    if not 0 <= plan.inflation <= MAX_INFLATION:
+        raise ValueError(f"inflation entre 0 et {MAX_INFLATION:.0%} par an (reçu {plan.inflation})")
     if model.method == "normal" and (model.sigma < 0 or model.mu <= -1):
         raise ValueError("volatilité positive et rendement > -100 % attendus")
 
@@ -115,10 +119,16 @@ def simulate(plan: Plan, model: Returns, n_paths: int = 5000, seed: int = 42) ->
     buy, custody = _fee_rates(plan)
     paths, invested = _paths(plan, r, buy, custody)
     final = paths[:, -1]
+    deflator = (1 + plan.inflation) ** (np.arange(months + 1) / 12)  # 1 F d'aujourd'hui vaut deflator F au mois k
+    real_paths = paths / deflator
+    real_final = real_paths[:, -1]
     drawdown = (paths / np.maximum.accumulate(paths, axis=1) - 1).min(axis=1)
     q = np.percentile(paths, PERCENTILES, axis=0)
     fan = pd.DataFrame({f"p{p}": q[i] for i, p in enumerate(PERCENTILES)}, index=pd.RangeIndex(0, months + 1))
     fan["invested"] = invested
+    qr = np.percentile(real_paths, PERCENTILES, axis=0)
+    fan_real = pd.DataFrame({f"p{p}": qr[i] for i, p in enumerate(PERCENTILES)}, index=fan.index)
+    fan_real["invested"] = np.asarray(invested) / deflator
     return {
         "fan": fan,
         "final_median": float(np.median(final)),
@@ -128,19 +138,28 @@ def simulate(plan: Plan, model: Returns, n_paths: int = 5000, seed: int = 42) ->
         "prob_goal": float((final >= plan.goal).mean()),
         "median_max_drawdown": float(np.median(drawdown)),
         "worst_drawdown_p5": float(np.percentile(drawdown, 5)),
+        "fan_real": fan_real,
+        "final_median_real": float(np.median(real_final)),
+        "final_p5_real": float(np.percentile(real_final, 5)),
+        "final_p95_real": float(np.percentile(real_final, 95)),
+        "prob_goal_real": float((real_final >= plan.goal).mean()),  # objectif exprimé en francs d'aujourd'hui
         "buy_fee_rate": buy,
         "custody_rate": custody,
     }
 
 
-def required_monthly(plan: Plan, model: Returns, confidence: float = 0.5, n_paths: int = 2000) -> float:
-    """Versement mensuel nécessaire pour atteindre l'objectif avec la probabilité donnée (recherche bornée)."""
+def required_monthly(plan: Plan, model: Returns, confidence: float = 0.5, n_paths: int = 2000, real: bool = False) -> float:
+    """Versement mensuel nécessaire pour atteindre l'objectif avec la probabilité donnée (recherche bornée).
+
+    real : objectif exprimé en francs d'aujourd'hui (corrigé de l'inflation du plan).
+    """
     if not 0 < confidence < 1:
         raise ValueError(f"probabilité entre 0 et 1 exclus (reçu {confidence})")
 
     def reaches(monthly: float) -> bool:
         """Vrai si ce versement mensuel atteint l'objectif avec la probabilité demandée."""
-        return bool(simulate(replace(plan, monthly=monthly), model, n_paths)["prob_goal"] >= confidence)
+        key = "prob_goal_real" if real else "prob_goal"
+        return bool(simulate(replace(plan, monthly=monthly), model, n_paths)[key] >= confidence)
 
     lo, hi = 0.0, max(plan.goal / (plan.years * 12), MIN_MONTHLY_GUESS)
     for _ in range(SEARCH_GROW_STEPS):

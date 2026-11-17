@@ -6,8 +6,10 @@ import plotly.graph_objects as go
 import pandas as pd
 import streamlit as st
 
-from brvm import market, ui
+from brvm import glossary, market, ui
 from brvm.bots import signals
+
+G = glossary.TERMS
 
 ui.setup("Marché", "Les 48 valeurs de la BRVM", "Cours de la dernière séance, rendement en dividende net et signal de veille.")
 if ui.no_data_warning():
@@ -57,13 +59,20 @@ st.dataframe(
     width="stretch",
     height=520,
     column_config={
-        "Cours": st.column_config.NumberColumn(format="%.0f F"),
+        "Cours": st.column_config.NumberColumn(format="%.0f F", help=G["Cours"]),
         "Jour": st.column_config.NumberColumn(format="percent"),
         "Depuis janv.": st.column_config.NumberColumn(format="percent"),
-        "Dernier div. net": st.column_config.NumberColumn(format="%.0f F"),
-        "Rdt net": st.column_config.NumberColumn(format="percent"),
-        "Échangé / jour": st.column_config.NumberColumn(format="%.0f F"),
-        "Signal veille": st.column_config.ProgressColumn(min_value=-2, max_value=2, format="%.2f"),
+        "Dernier div. net": st.column_config.NumberColumn(
+            format="%.0f F", help="Dernier " + G["Dividende"].lower() + " Montant net d'IRVM."
+        ),
+        "Rdt net": st.column_config.NumberColumn(format="percent", help=G["Rendement (dividende)"]),
+        "Échangé / jour": st.column_config.NumberColumn(format="%.0f F", help=G["Liquidité"]),
+        "Signal veille": st.column_config.ProgressColumn(
+            min_value=-2,
+            max_value=2,
+            format="%.2f",
+            help="Moyenne des articles des 60 derniers jours, de -2 (défavorable) à +2 (favorable).",
+        ),
     },
 )
 

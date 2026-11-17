@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from brvm import db, ui
+from brvm import db, glossary, ui
 
 VIDEO = Path(__file__).resolve().parent.parent / "assets" / "tutoriel.mp4"
 
@@ -198,9 +198,12 @@ FAQ = (
     ),
     (
         "Que lit Claude pour écrire la note du jour ?",
-        "Tes objectifs de la semaine, ton portefeuille (opérations, cours, poids des lignes), les articles de veille des "
-        "trois derniers jours avec leurs scores, et l'actualité récente qu'il cherche lui-même sur le web (BRVM, tes "
-        "sociétés, BCEAO, matières premières). Il ne passe aucun ordre et n'écrit que la note.",
+        "Tes objectifs de la semaine, ton portefeuille (opérations, cours, poids des lignes), le bulletin officiel de la "
+        "cote (PER et rendement de tes titres comparés au marché), l'agenda des sociétés, les dividendes annoncés, les "
+        "rapports publiés, les articles de veille des trois derniers jours avec leurs scores, et l'actualité récente qu'il "
+        "cherche lui-même sur le web (BRVM, tes sociétés, BCEAO, matières premières). Il signale quand les cours ne sont "
+        "pas à jour. La note est aussi envoyée par e-mail au propriétaire du compte. Il ne passe aucun ordre et n'écrit "
+        "que la note.",
     ),
     (
         "Faut-il une clé API Claude ?",
@@ -232,8 +235,8 @@ has_prices = not db.df("SELECT 1 FROM prices LIMIT 1").empty
 if not has_prices:
     st.warning("Aucun cours en base pour l'instant : commence par l'étape 1.", icon=":material/flag:")
 
-tab_video, tab_start, tab_steps, tab_routine, tab_faq = st.tabs(
-    ["Vidéo", "En bref", "Pas à pas", "Routine", "Questions fréquentes"]
+tab_video, tab_start, tab_steps, tab_routine, tab_faq, tab_words = st.tabs(
+    ["Vidéo", "En bref", "Pas à pas", "Routine", "Questions fréquentes", "Glossaire"]
 )
 
 with tab_video:
@@ -278,3 +281,12 @@ with tab_faq:
     for question, answer in FAQ:
         with st.expander(question):
             st.markdown(answer)
+
+with tab_words:
+    ui.section("Glossaire", "Les mots de la bourse, en clair")
+    query = st.text_input("Chercher un mot", placeholder="PER, dividende, SGI…", label_visibility="collapsed")
+    found = glossary.search(query)
+    if not found:
+        st.info("Aucun mot trouvé. Essaie un autre terme.")
+    for word in sorted(found, key=str.lower):
+        st.markdown(f"**{word}** — {found[word]}")

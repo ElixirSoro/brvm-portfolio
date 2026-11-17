@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from brvm import auth, db, fees, market, portfolio, ui
+from brvm import auth, db, fees, market, portfolio, statement, ui
 
 # erreurs attendues d'un import CSV (fichier mal formé ou refusé par la base)
 IMPORT_ERRORS: tuple[type[Exception], ...] = (KeyError, pd.errors.ParserError, UnicodeDecodeError, *db.SAVE_ERRORS)
@@ -54,6 +54,31 @@ st.markdown(
     f'<span class="elx-num">{ui.fcfa(s["net_invested"])}</span> · valeur si tout était vendu aujourd\'hui, frais de sortie '
     f'et droits de garde courus déduits : <span class="elx-num">{ui.fcfa(s["liquidation_value"])}</span></p>',
     unsafe_allow_html=True,
+)
+
+
+@st.cache_data(ttl=600, show_spinner="Préparation du relevé…")
+def monthly_statement(who: str, port_id: int, month: str, n_tx: int, holder: str) -> bytes:
+    """Relevé PDF du mois (cache par propriétaire, portefeuille, mois et nombre d'opérations)."""
+    auth.set_owner(who)
+    p, summary = portfolio.valuation(port_id)
+    tx = portfolio.transactions(port_id)
+    start = pd.Timestamp(month)
+    in_month = tx[(tx["date"] >= start) & (tx["date"] < start + pd.offsets.MonthBegin(1))] if not tx.empty else tx
+    name = str(portfolio.list_all().set_index("id").loc[port_id, "name"])
+    return statement.build(statement.Header(name, holder, start.date(), date.today()), p, summary, in_month)
+
+
+months = [(pd.Timestamp(date.today()).to_period("M") - k).to_timestamp().date().isoformat() for k in range(12)]
+r1, r2 = st.columns([1, 2], vertical_alignment="bottom")
+picked = r1.selectbox("Relevé du mois", months, format_func=lambda m: statement.month_label(date.fromisoformat(m)).capitalize())
+me = ui.current_user()
+r2.download_button(
+    "Télécharger le relevé PDF",
+    monthly_statement(auth.owner(), pid, picked, len(portfolio.transactions(pid)), me.email if me else "moi"),
+    file_name=f"releve-{picked[:7]}.pdf",
+    mime="application/pdf",
+    icon=":material/picture_as_pdf:",
 )
 
 tab_pos, tab_add, tab_hist, tab_div, tab_io = st.tabs(
