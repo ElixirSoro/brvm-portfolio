@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   visite:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright ne prend pas encore en charge Chromium sur ubuntu-latest (26.04)
     timeout-minutes: 10
     env:
       SITE: https://brvm-portfolio-soro.streamlit.app/
