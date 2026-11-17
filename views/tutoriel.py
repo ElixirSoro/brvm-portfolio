@@ -1,4 +1,4 @@
-"""Page Tutoriel : comment utiliser BRVM Portfolio, du premier lancement à la routine hebdomadaire."""
+"""Page Tutoriel : comment utiliser Mr investor, du premier lancement à la routine quotidienne et hebdomadaire."""
 
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # le contenu est déclaré dans STEPS, la page ne fait qu'afficher.
@@ -98,8 +98,9 @@ STEPS = (
             "Le **signal** de chaque action résume les 60 derniers jours ; les **indicateurs** suivent cacao, pétrole, "
             "change et taux.",
         ),
-        "Sans clé API Claude, l'analyse se fait par mots-clés, plus grossière. Les scores aident à lire l'actualité, "
-        "ce ne sont pas des conseils d'achat ou de vente.",
+        "Sans clé API Claude, l'analyse des articles se fait par mots-clés, plus grossière ; la note du jour (étape 7) "
+        "relit la veille et l'actualité avec Claude. Les scores aident à lire l'actualité, ce ne sont pas des conseils "
+        "d'achat ou de vente.",
     ),
     Step(
         "Lire les documents officiels",
@@ -116,14 +117,41 @@ STEPS = (
         "Les rapports scannés ne se lisent qu'avec la clé API Claude. Les chiffres lus par règles sont marqués "
         "« confiance faible » : vérifie-les sur le document avant de t'en servir.",
     ),
+    Step(
+        "Fixer tes objectifs et lire la note du jour",
+        "views/objectifs.py",
+        ":material/flag:",
+        "Donner un cap à ta semaine et recevoir chaque matin l'analyse de Claude : ce qui a bougé et ce qu'il faut étudier.",
+        (
+            "Ouvre **Objectifs et note du jour**, choisis la semaine et clique sur **Ajouter un objectif**.",
+            "Choisis la nature : **Action à mener** (verser 20 000 F, ramener une ligne sous 15 %, lire un rapport) ou "
+            "**Objectif chiffré** (une valeur visée, avec son unité). Coche-le quand il est atteint, ou abandonne-le.",
+            "Le lendemain matin, lis la **note du jour** : marché, portefeuille, veille, avancement de tes objectifs et "
+            "pistes d'ajustement avec leur coût en frais. Un résumé s'affiche aussi sur l'Accueil.",
+        ),
+        "La note n'est pas écrite au moment où tu saisis un objectif : Claude passe chaque matin du mardi au samedi "
+        "vers 6 h 45 et analyse la séance de la veille. Pour une analyse tout de suite, lance la tâche "
+        "« Mr investor — note du jour » depuis tes tâches planifiées sur claude.ai. Claude propose, tu décides : "
+        "aucun ordre n'est passé.",
+    ),
 )
 
 ROUTINE = (
     (
-        "Chaque jour de séance",
-        "Accueil › **Mettre à jour les cours** ; coup d'œil aux plus fortes variations et aux signaux de veille.",
+        "Tout seul, sans rien faire",
+        "Les bots mettent à jour les cours et le bulletin officiel (BOC) chaque soir de séance, la veille et les "
+        "indicateurs trois fois par jour, la liste des rapports des sociétés le dimanche ; Claude écrit la note du jour "
+        "du mardi au samedi vers 6 h 45.",
     ),
-    ("Chaque semaine", "Veille › collecte et analyse ; Documents officiels › **Importer les derniers BOC**."),
+    (
+        "Chaque matin",
+        "Accueil : coup d'œil au portefeuille, aux plus fortes variations et au résumé de la note du jour ; "
+        "la note complète est dans **Objectifs et note du jour**.",
+    ),
+    (
+        "Chaque lundi",
+        "**Objectifs et note du jour** › fixe un ou deux objectifs pour la semaine ; coche ceux de la semaine passée.",
+    ),
     ("À chaque opération", "Mon portefeuille › **Saisir une opération** avec les montants exacts de l'avis d'opéré."),
     (
         "Chaque saison de dividendes (avril-septembre)",
@@ -156,6 +184,23 @@ FAQ = (
         "Le logiciel déduit tous les frais (courtage minimum, BRVM, DC/BR, AMF, TVA, droits de garde) et l'impôt sur "
         "les dividendes, et il réduit volontairement les rendements passés exceptionnels.",
     ),
+    (
+        "Quand Claude analyse-t-il mes objectifs ?",
+        "Au passage suivant de la tâche planifiée : chaque matin du mardi au samedi vers 6 h 45 (heure d'Abidjan), sur "
+        "la séance de la veille. Un objectif saisi à 9 h est donc pris en compte le lendemain matin. Pour une analyse "
+        "immédiate, lance la tâche « Mr investor — note du jour » depuis tes tâches planifiées sur claude.ai.",
+    ),
+    (
+        "Que lit Claude pour écrire la note du jour ?",
+        "Tes objectifs de la semaine, ton portefeuille (opérations, cours, poids des lignes), les articles de veille des "
+        "trois derniers jours avec leurs scores, et l'actualité récente qu'il cherche lui-même sur le web (BRVM, tes "
+        "sociétés, BCEAO, matières premières). Il ne passe aucun ordre et n'écrit que la note.",
+    ),
+    (
+        "Faut-il une clé API Claude ?",
+        "Pas pour la note du jour : elle passe par ton compte Claude et le connecteur de ta base. La clé API reste utile "
+        "pour l'analyse fine des articles dans la page Veille et pour lire les rapports scannés.",
+    ),
     ("Une page affiche « Aucun cours en base »", "Les données ne sont pas encore chargées : commence par l'étape 1 (Réglages)."),
 )
 
@@ -173,7 +218,7 @@ def render_step(number: int, step: Step) -> None:
 ui.setup(
     "Tutoriel",
     f"Bien démarrer avec {ui.APP_NAME}",
-    "Six étapes pour passer d'une application vide à un portefeuille suivi au franc près, puis la routine pour "
+    "Sept étapes pour passer d'une application vide à un portefeuille suivi au franc près, puis la routine pour "
     "le garder à jour. Chaque étape a un lien direct vers la page concernée.",
 )
 
@@ -197,12 +242,13 @@ with tab_video:
         )
 
 with tab_start:
-    ui.section("Le principe", "Quatre questions, quatre pages")
+    ui.section("Le principe", "Cinq questions, cinq pages")
     st.markdown(
         "- **Quel portefeuille pour mon niveau de risque ?** → Profil et optimiseur\n"
         "- **Où peut-il m'amener ?** → Simulations\n"
         "- **Où en est mon vrai portefeuille, frais compris ?** → Mon portefeuille\n"
-        "- **Qu'est-ce qui peut faire bouger mes actions ?** → Veille et Documents officiels"
+        "- **Qu'est-ce qui peut faire bouger mes actions ?** → Veille et Documents officiels\n"
+        "- **Que faire cette semaine pour avancer ?** → Objectifs et note du jour"
     )
     ui.section("Les étapes", "Dans l'ordre")
     st.markdown("\n".join(f"{i}. {s.title}" for i, s in enumerate(STEPS, 1)))
@@ -217,7 +263,10 @@ with tab_routine:
     ui.section("Routine", "Garder le portefeuille à jour")
     for when, what in ROUTINE:
         st.markdown(f"**{when}** : {what}")
-    st.caption("Sur ton Mac, « Lancer les bots.command » fait la collecte des cours, des actualités et des BOC tout seul.")
+    st.caption(
+        "La version en ligne se met à jour seule (bots planifiés sur GitHub). Sur ton Mac, « Lancer les bots.command » "
+        "fait la même collecte pour la version installée."
+    )
 
 with tab_faq:
     for question, answer in FAQ:
