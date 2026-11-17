@@ -28,8 +28,8 @@ tab_boc, tab_fin, tab_events = st.tabs(["Bulletins de la cote", "États financie
 # ---------------------------------------------------------------- BOC
 with tab_boc:
     c1, c2 = st.columns([1, 3])
-    n = c1.number_input("Nombre de BOC à importer", 1, documents.MAX_BOC_BATCH, 5)
-    if c2.button("Importer les derniers BOC", icon=":material/download:", disabled=ui.locked()):
+    n = c1.number_input("Nombre de BOC à importer", 1, documents.MAX_BOC_BATCH, 5) if not ui.locked() else 0
+    if not ui.locked() and c2.button("Importer les derniers BOC", icon=":material/download:"):
         bar = st.progress(0.0, "Lecture des BOC…")
         try:
             r = documents.import_latest_bocs(int(n), progress=lambda p, d: bar.progress(p, f"BOC du {d}"))
@@ -41,7 +41,7 @@ with tab_boc:
             st.error(f"brvm.org ne répond pas : {e}")
     dates = db.df("SELECT date FROM boc_market ORDER BY date DESC")["date"].tolist()
     if not dates:
-        st.info("Aucun BOC en base. Clique sur **Importer les derniers BOC**.")
+        st.info("Aucun bulletin en base pour l'instant : ils arrivent automatiquement chaque soir de séance.")
     else:
         day = st.selectbox("Séance", dates)
         mk = db.df("SELECT * FROM boc_market WHERE date=?", (day,)).iloc[0]
@@ -154,22 +154,21 @@ with tab_fin:
     secs = market.securities()
     c1, c2 = st.columns([2, 1])
     ticker = c1.selectbox("Société", secs.index, format_func=lambda t: f"{t} · {secs.loc[t, 'name']}")
-    if c2.button("Mettre à jour la liste des rapports", icon=":material/sync:", disabled=ui.locked()):
+    if not ui.locked() and c2.button("Mettre à jour la liste des rapports", icon=":material/sync:"):
         r = documents.refresh_reports([ticker])
         st.toast(f"{r['new']} nouveaux rapports")
         for msg in r["errors"]:
             st.warning(msg)
-    if st.button(
+    if not ui.locked() and st.button(
         "Mettre à jour les rapports des 48 sociétés",
         help="Environ 1 minute. Les nouveaux rapports apparaissent aussi dans la Veille.",
-        disabled=ui.locked(),
     ):
         bar = st.progress(0.0, "Rapports…")
         r = documents.refresh_reports(list(secs.index), progress=bar.progress)
         st.toast(f"{r['new']} nouveaux rapports")
     reps = db.df("SELECT * FROM reports WHERE ticker=? ORDER BY published DESC", (ticker,))
     if reps.empty:
-        st.info("Aucun rapport en base pour cette société : clique sur **Mettre à jour la liste des rapports**.")
+        st.info("Aucun rapport en base pour cette société pour l'instant.")
     else:
         st.dataframe(
             reps[["published", "kind", "period", "title", "analyzed", "method"]].rename(
@@ -194,7 +193,7 @@ with tab_fin:
             disabled=not ai_ok,
             help=None if ai_ok else "Ajoute ANTHROPIC_API_KEY dans .env pour activer la lecture par IA.",
         )
-        if st.button("Analyser ce rapport", type="primary", icon=":material/query_stats:", disabled=ui.locked()):
+        if not ui.locked() and st.button("Analyser ce rapport", type="primary", icon=":material/query_stats:"):
             with st.spinner("Téléchargement et lecture du rapport…"):
                 try:
                     out = documents.analyze_report(pick, use_ai)

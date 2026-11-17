@@ -46,7 +46,7 @@ STEPS = (
         ":material/tune:",
         "Savoir quelle part d'actions et quelles actions conviennent à ta tolérance au risque.",
         (
-            "Ouvre **Profil et optimiseur** et réponds aux 6 questions (ou règle le **Goût du risque** à la main "
+            "Ouvre **Mon portefeuille idéal** et réponds aux 6 questions (ou règle le **Goût du risque** à la main "
             "dans « Choisir directement »).",
             "À l'étape 2, indique ton **capital** et, si besoin, les contraintes : poids maximum par action et par secteur, "
             "obligations autorisées ou non.",
@@ -62,7 +62,7 @@ STEPS = (
         ":material/insights:",
         "Voir où le plan peut t'amener dans 10 ans, et avec quelle probabilité tu atteins ton objectif.",
         (
-            "Ouvre **Simulations**, saisis le capital de départ, le versement mensuel, la durée et l'objectif.",
+            "Ouvre **Simuler mon plan**, saisis le capital de départ, le versement mensuel, la durée et l'objectif.",
             "Choisis la source du rendement : le portefeuille de l'optimiseur, un profil type, ton portefeuille virtuel "
             "ou tes propres hypothèses.",
             "Lis la **fourchette** (médiane, 50 % et 90 % des cas) et la **probabilité d'atteindre l'objectif**, puis "
@@ -76,9 +76,11 @@ STEPS = (
         ":material/account_balance_wallet:",
         "Suivre ton vrai portefeuille au cours du jour, frais, dividendes et impôt compris.",
         (
-            "Depuis l'optimiseur, **Créer ce portefeuille virtuel** reprend les ordres proposés ; sinon, "
+            "Depuis **Mon portefeuille idéal**, **Suivre ce portefeuille** reprend les ordres proposés ; sinon, "
             "**Mon portefeuille › Nouveau portefeuille**.",
-            "Dans **Saisir une opération**, recopie chaque avis d'opéré : dépôt, achat, vente (quantité, cours, frais "
+            "Pour un achat, une vente, un dépôt ou un dividende, le bouton **Nouvelle opération** de l'Accueil suffit "
+            "(frais calculés tout seuls). Pour le reste, **Mon portefeuille › Saisir une opération** : recopie chaque "
+            "avis d'opéré : dépôt, achat, vente (quantité, cours, frais "
             "réels), dividende reçu, droits de garde.",
             "**Positions et performance** donne la valeur, la plus-value, la valeur si tout était vendu aujourd'hui et la "
             "comparaison avec le BRVM Composite. **Dividendes à recevoir** propose ceux du calendrier auxquels tu as droit.",
@@ -152,14 +154,18 @@ ROUTINE = (
         "Chaque lundi",
         "**Objectifs et note du jour** › fixe un ou deux objectifs pour la semaine ; coche ceux de la semaine passée.",
     ),
-    ("À chaque opération", "Mon portefeuille › **Saisir une opération** avec les montants exacts de l'avis d'opéré."),
+    (
+        "À chaque opération",
+        "Accueil › **Nouvelle opération** (achat, vente, dépôt, dividende) ; Mon portefeuille › **Saisir une opération** "
+        "pour les autres cas ou pour recopier les frais exacts de l'avis d'opéré.",
+    ),
     (
         "Chaque saison de dividendes (avril-septembre)",
         "Mon portefeuille › **Dividendes à recevoir** ; Réglages › calendrier des dividendes.",
     ),
     (
         "Chaque année",
-        "Profil et optimiseur avec tes nouveaux montants ; Simulations pour vérifier que l'objectif "
+        "Mon portefeuille idéal avec tes nouveaux montants ; Simuler mon plan pour vérifier que l'objectif "
         "reste atteignable ; rééquilibrage si une ligne s'est trop écartée de sa cible.",
     ),
 )
@@ -244,8 +250,8 @@ with tab_video:
 with tab_start:
     ui.section("Le principe", "Cinq questions, cinq pages")
     st.markdown(
-        "- **Quel portefeuille pour mon niveau de risque ?** → Profil et optimiseur\n"
-        "- **Où peut-il m'amener ?** → Simulations\n"
+        "- **Quel portefeuille pour mon niveau de risque ?** → Mon portefeuille idéal\n"
+        "- **Où peut-il m'amener ?** → Simuler mon plan\n"
         "- **Où en est mon vrai portefeuille, frais compris ?** → Mon portefeuille\n"
         "- **Qu'est-ce qui peut faire bouger mes actions ?** → Veille et Documents officiels\n"
         "- **Que faire cette semaine pour avancer ?** → Objectifs et note du jour"

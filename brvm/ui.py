@@ -159,6 +159,15 @@ h1 {{ font-weight: 800 !important; }}
     padding: 14px 16px; width: 100%; transition: transform .18s ease, border-color .18s ease, background .18s ease; }}
 .st-key-raccourcis [data-testid="stPageLink"] a:hover {{ transform: translateY(-2px); border-color: {ACCENT};
     background: {SURFACE}; }}
+.st-key-raccourcis .stButton > button {{ background: {SURFACE_ALT}; border: 1px solid {LINE}; border-radius: 16px;
+    padding: 14px 16px; min-height: 0; justify-content: flex-start; transition: transform .18s ease, border-color .18s ease; }}
+.st-key-raccourcis .stButton > button > div, .st-key-raccourcis .stButton > button [data-testid="stMarkdownContainer"] {{
+    justify-content: flex-start; text-align: left; width: auto; }}
+.st-key-raccourcis .stButton > button, .st-key-raccourcis [data-testid="stPageLink"] a {{ min-height: 64px; height: 100%; }}
+.st-key-raccourcis .stButton > button:hover {{ transform: translateY(-2px); border-color: {ACCENT}; background: {SURFACE}; }}
+.st-key-raccourcis .stButton > button p, .st-key-raccourcis [data-testid="stPageLink"] a p {{ font-weight: 600;
+    color: {PAPER}; font-size: 15px; white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }}
+.st-key-raccourcis .stButton > button span[data-testid="stIconMaterial"] {{ color: {ACCENT}; font-size: 22px; }}
 .st-key-raccourcis [data-testid="stPageLink"] a p {{ font-weight: 600; color: {PAPER}; font-size: 15px; }}
 .st-key-raccourcis [data-testid="stPageLink"] a span[data-testid="stIconMaterial"] {{ color: {ACCENT}; font-size: 22px; }}
 .st-key-parcours {{ background: linear-gradient(120deg, rgba(240,180,41,.16), rgba(122,166,226,.08));
@@ -393,7 +402,7 @@ def locked() -> bool:
 def locked_note() -> None:
     """Explique pourquoi certains boutons sont grisés."""
     if locked():
-        st.caption("Les mises à jour des données communes (cours, documents, veille) sont réservées à l'administrateur.")
+        st.caption("Ces données se mettent à jour automatiquement plusieurs fois par jour : il n'y a rien à faire.")
 
 
 def account_box() -> None:

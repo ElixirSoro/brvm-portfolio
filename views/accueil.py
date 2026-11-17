@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from brvm import auth, db, ecole, goals, home, market, portfolio, ui
+from brvm import auth, db, ecole, fees, goals, home, market, portfolio, ui
 from brvm.bots import signals
 from brvm.data import quotes as quotes_src
 
@@ -170,6 +170,49 @@ def show_news() -> None:
     st.page_link("views/veille.py", label="Toute la veille", icon=":material/arrow_forward:")
 
 
+KINDS = {"ACHAT": "Achat", "VENTE": "Vente", "DEPOT": "Dépôt d'argent", "DIVIDENDE": "Dividende reçu"}
+
+
+@st.dialog("Ajouter une opération")
+def quick_operation(ports: pd.DataFrame) -> None:
+    """Saisie rapide des quatre opérations les plus courantes ; frais calculés avec la grille enregistrée."""
+    if ports.empty:
+        st.info("Crée d'abord ton portefeuille : c'est là que tes opérations seront rangées.")
+        st.page_link("views/portefeuille.py", label="Créer mon portefeuille", icon=":material/add_circle:")
+        return
+    names = dict(zip(ports["id"].astype(int), ports["name"], strict=True))
+    pid = int(st.selectbox("Portefeuille", list(names), format_func=names.__getitem__)) if len(names) > 1 else next(iter(names))
+    kind = st.segmented_control("Ce que tu as fait", list(KINDS), format_func=KINDS.__getitem__, default="ACHAT") or "ACHAT"
+    day = st.date_input("Date", date.today(), format="DD/MM/YYYY", max_value=date.today())
+    secs = market.securities()
+    ticker, qty, price, amount = None, 0.0, 0.0, None
+    if kind in ("ACHAT", "VENTE", "DIVIDENDE"):
+        ticker = st.selectbox("Action", list(secs.index), format_func=lambda t: f"{secs.loc[t, 'name']} ({t})")
+    if kind in ("ACHAT", "VENTE"):
+        last = quotes()["last"].get(ticker, 0.0) if ticker else 0.0
+        c1, c2 = st.columns(2)
+        qty = float(c1.number_input("Nombre d'actions", 1, 10_000_000, 10))
+        price = float(c2.number_input("Prix d'une action (F)", 0.0, 10_000_000.0, float(last or 0.0), 5.0))
+        if qty and price:
+            of = fees.order_fees(qty * price)
+            sign = 1 if kind == "ACHAT" else -1
+            st.caption(f"Frais estimés avec ta grille : {ui.fcfa(of.total)} · total {'débité' if sign > 0 else 'reçu'} : "
+                       f"{ui.fcfa(qty * price + sign * of.total)}")  # fmt: skip
+    else:
+        amount = float(st.number_input("Montant (F)", 0.0, 10_000_000_000.0, 0.0, 1000.0))
+        if kind == "DIVIDENDE":
+            st.caption("Indique le montant net reçu sur ton compte (après impôt).")
+    if st.button("Enregistrer", type="primary", icon=":material/check:", width="stretch"):
+        try:
+            portfolio.add(pid, portfolio.Operation(day.isoformat(), kind, ticker, qty, price, amount))
+            st.cache_data.clear()
+            st.session_state["op_saved"] = KINDS[kind]
+            st.rerun()
+        except db.SAVE_ERRORS as e:
+            st.error(db.redact(str(e)))
+    st.caption("Retrait, frais de garde, coupon, ou frais lus sur l'avis d'opéré : page **Mon portefeuille**.")
+
+
 def show_coach() -> None:
     """Objectifs de la semaine et dernière note de Claude, avec un lien vers la page dédiée."""
     week = goals.list_week(goals.week_start(date.today()))
@@ -185,7 +228,7 @@ def show_coach() -> None:
                   unsafe_allow_html=True)  # fmt: skip
     with right, st.container(border=True):
         if latest.empty:
-            st.caption("Pas encore de note : Claude l'écrit chaque soir de séance.")
+            st.caption("Pas encore de note : Claude l'écrit chaque matin du mardi au samedi.")
         else:
             st.markdown(f"**{latest.iloc[0]['headline']}**")
             st.caption(f"Note du {date.fromisoformat(str(latest.iloc[0]['date'])[:10]):%d/%m/%Y}")
@@ -223,6 +266,9 @@ given = str(st.user.get("given_name") or "") if ui.google_signed_in() else ""  #
 greeting = given or (home.first_name(user.email) if user else "")
 st.markdown(home.header(greeting, now.date(), is_open, status), unsafe_allow_html=True)
 
+saved = st.session_state.pop("op_saved", None)
+if saved:
+    st.toast(f"{saved} enregistré dans ton portefeuille.", icon=":material/check_circle:")
 my_ports = portfolio.list_all()
 main_col, side_col = st.columns([1.7, 1])
 with main_col:
@@ -233,8 +279,9 @@ with side_col:
 
 with st.container(key="raccourcis"):
     a1, a2, a3, a4 = st.columns(4)
-    a1.page_link("views/portefeuille.py", label="Ajouter une opération", icon=":material/add_circle:", width="stretch")
-    a2.page_link("views/optimiseur.py", label="Mon portefeuille idéal", icon=":material/target:", width="stretch")
+    if a1.button("Nouvelle opération", icon=":material/add_circle:", width="stretch"):
+        quick_operation(my_ports)
+    a2.page_link("views/optimiseur.py", label="Portefeuille idéal", icon=":material/target:", width="stretch")
     a3.page_link("views/simulations.py", label="Simuler mon plan", icon=":material/insights:", width="stretch")
     a4.page_link("views/marche.py", label="Explorer le marché", icon=":material/candlestick_chart:", width="stretch")
 

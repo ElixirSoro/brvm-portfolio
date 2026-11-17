@@ -22,27 +22,30 @@ ui.setup(
 ui.locked_note()
 
 ai_on = bool(config.ANTHROPIC_API_KEY)
-st.markdown(
-    f'<p class="elx-sub">Analyse : <span class="elx-num">{"IA (" + config.ANTHROPIC_MODEL + ")" if ai_on else "mots-clés"}</span>'
-    + ("" if ai_on else " · ajoute ta clé API Claude dans le fichier .env pour une analyse fine")
-    + "</p>",
-    unsafe_allow_html=True,
-)
+if not ui.locked():
+    st.markdown(
+        '<p class="elx-sub">Analyse : <span class="elx-num">'
+        + ("IA (" + config.ANTHROPIC_MODEL + ")" if ai_on else "mots-clés")
+        + "</span>"
+        + ("" if ai_on else " · ajoute ta clé API Claude dans le fichier .env pour une analyse fine")
+        + "</p>",
+        unsafe_allow_html=True,
+    )
 
 b1, b2, b3 = st.columns(3)
-if b1.button("Collecter les actualités", icon=":material/travel_explore:", width="stretch", disabled=ui.locked()):
+if not ui.locked() and b1.button("Collecter les actualités", icon=":material/travel_explore:", width="stretch"):
     bar = st.progress(0.0, "Lecture des flux…")
     r = collector.collect(progress=lambda p, q: bar.progress(p, f"Flux : {q}"))
     st.toast(
         f"{r['new']} nouveaux articles sur {r['feeds']} flux" + (f" · {len(r['errors'])} flux en erreur" if r["errors"] else "")
     )
-if b2.button("Analyser les nouveaux articles", icon=":material/psychology:", width="stretch", disabled=ui.locked()):
+if not ui.locked() and b2.button("Analyser les nouveaux articles", icon=":material/psychology:", width="stretch"):
     bar = st.progress(0.0, "Analyse…")
     r = analyst.analyze_pending(progress=lambda p, _: bar.progress(p, "Analyse…"))
     st.toast(f"{r['analyzed']} articles analysés ({r['by_ai']} par l'IA)")
     if r["errors"]:
         st.warning("L'IA a renvoyé des erreurs, le score par mots-clés a pris le relais : " + r["errors"][0])
-if b3.button("Mettre à jour les indicateurs", icon=":material/show_chart:", width="stretch", disabled=ui.locked()):
+if not ui.locked() and b3.button("Mettre à jour les indicateurs", icon=":material/show_chart:", width="stretch"):
     with st.spinner("Pétrole, cacao, sucre, or, euro/dollar, taux US…"):
         r = collector.collect_market_factors()
     st.toast(f"{r['ok']} indicateurs à jour")
@@ -142,7 +145,7 @@ if not news.empty:
 ui.section("Indicateurs", "Matières premières, change et taux")
 fac = db.df("SELECT * FROM factors")
 if fac.empty:
-    st.info("Clique sur **Mettre à jour les indicateurs** (nécessite le module yfinance).")
+    st.info("Pas encore d'indicateurs : ils sont collectés automatiquement plusieurs fois par jour.")
 else:
     fac["date"] = pd.to_datetime(fac["date"])
     wide = fac.pivot(index="date", columns="code", values="value").sort_index()
