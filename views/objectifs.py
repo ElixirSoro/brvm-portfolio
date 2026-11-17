@@ -77,6 +77,7 @@ def add_form(week: str) -> None:
         if st.form_submit_button("Ajouter l'objectif", type="primary", icon=":material/add:"):
             try:
                 goals.add(week, kind or "action", title, target, unit)
+                st.session_state["goal_added"] = title.strip()
                 st.rerun()
             except db.SAVE_ERRORS as e:
                 st.error(db.redact(str(e)))
@@ -92,13 +93,18 @@ def show_note(note: pd.Series) -> None:
 ui.setup(
     "Objectifs",
     "Objectifs et note du jour",
-    "Fixe tes objectifs de la semaine. Chaque soir de séance, Claude lit la veille, l'actualité et ton portefeuille, "
+    "Fixe tes objectifs de la semaine. Chaque matin (du mardi au samedi), Claude lit la veille, l'actualité et ton portefeuille, "
     "puis écrit ici ce qui a changé et les ajustements à étudier pour t'en rapprocher.",
 )
 
 today = goals.week_start(date.today())
 mondays = [(date.fromisoformat(today) + timedelta(weeks=k)).isoformat() for k in range(WEEKS_AHEAD, -WEEKS_BACK - 1, -1)]
 ui.section("Semaine", "Mes objectifs")
+added = st.session_state.pop("goal_added", None)
+if added:
+    st.success(f"Objectif ajouté : « {added} ». Claude en tiendra compte dans la note de demain matin.", icon=":material/check:")
+st.caption("Claude lit tes objectifs chaque matin du mardi au samedi vers 6 h 45 : un objectif ajouté aujourd'hui "
+           "apparaît dans la note de demain.")  # fmt: skip
 picked = st.selectbox("Semaine", mondays, index=WEEKS_AHEAD, format_func=week_label, label_visibility="collapsed") or today
 mine = goals.list_week(picked)
 reached, kept = goals.progress(mine)
@@ -122,7 +128,7 @@ ui.section("Analyse", "La note du jour")
 history = goals.notes(30)
 if history.empty:
     st.info(
-        "Pas encore de note. Elle est rédigée chaque soir de séance par Claude (tâche planifiée de ton compte Claude), "
+        "Pas encore de note. Elle est rédigée chaque matin du mardi au samedi par Claude (tâche planifiée de ton compte Claude), "
         "à partir de la veille, de l'actualité, de ton portefeuille et de tes objectifs.",
         icon=":material/edit_note:",
     )

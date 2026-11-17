@@ -1,4 +1,4 @@
-"""Page Profil et optimiseur : questionnaire de risque, portefeuille optimal, ordres, frontière efficiente."""
+"""Page Mon portefeuille idéal : questionnaire de risque, portefeuille optimal, ordres, frontière efficiente."""
 
 # DÉROGATION règle 4 : page Streamlit exécutée de haut en bas à chaque interaction ;
 # la logique est dans le paquet brvm, la page ne fait qu'afficher.
@@ -14,16 +14,16 @@ from brvm import db, market, optimizer, portfolio, risk_profile, ui
 from brvm.bots import signals
 
 ui.setup(
-    "Profil et optimiseur",
+    "Mon portefeuille idéal",
     "Le portefeuille qui correspond à ton niveau de risque",
-    "Réponds au questionnaire, ajuste les contraintes : l'optimiseur cherche le meilleur compromis "
-    "rendement-risque pour ton profil, puis le traduit en ordres d'achat, frais compris.",
+    "Trois étapes : réponds à six questions, indique la somme à placer, et l'application te propose quoi acheter "
+    "et en quelle quantité, frais compris. Tu n'as rien d'autre à régler.",
 )
 if ui.no_data_warning():
     st.stop()
 
 # ---------------- profil ----------------
-ui.section("Étape 1", "Ton profil de risque")
+ui.section("Étape 1 sur 3", "Ton profil de risque")
 tab_q, tab_direct = st.tabs(["Questionnaire", "Choisir directement"])
 with tab_q:
     answers = []
@@ -45,19 +45,21 @@ st.session_state["profile"] = prof
 ui.metric_cards(
     [
         (prof["profile"], prof["description"], True),
-        (f"λ = {ui.nb(prof['lambda'], 1)}", "aversion au risque utilisée par l'optimiseur", False),
-        (ui.pct(prof["score_pct"], 0), "score au questionnaire", False),
+        (ui.pct(prof["score_pct"], 0), "ton goût du risque (0 % très prudent, 100 % audacieux)", False),
     ]
 )
 
 # ---------------- paramètres ----------------
-ui.section("Étape 2", "Contraintes et capital")
-c1, c2, c3, c4 = st.columns(4)
-capital = c1.number_input("Capital à investir (F)", 50_000, 1_000_000_000, 500_000, 50_000)
-max_w = c2.slider("Maximum par action", 5, 40, 15, format="%d %%") / 100
-max_s = c3.slider("Maximum par secteur", 20, 100, 40, format="%d %%") / 100
-hist = c4.select_slider("Historique utilisé", [2, 3, 5, 7, 10], 5, format_func=lambda y: f"{y} ans")
-with st.expander("Réglages avancés"):
+ui.section("Étape 2 sur 3", "La somme à placer")
+c1, c2 = st.columns([1, 2])
+capital = c1.number_input("Somme à investir (F)", 50_000, 1_000_000_000, 500_000, 50_000)
+c2.caption("Uniquement de l'argent dont tu n'auras pas besoin avant plusieurs années. Les réglages par défaut conviennent "
+           "à la plupart des cas : tu peux les laisser tels quels.")  # fmt: skip
+with st.expander("Réglages avancés (facultatif)", icon=":material/tune:"):
+    x1, x2, x3 = st.columns(3)
+    max_w = x1.slider("Maximum par action", 5, 40, 15, format="%d %%") / 100
+    max_s = x2.slider("Maximum par secteur", 20, 100, 40, format="%d %%") / 100
+    hist = x3.select_slider("Historique utilisé", [2, 3, 5, 7, 10], 5, format_func=lambda y: f"{y} ans")
     a1, a2, a3, a4 = st.columns(4)
     allow_bonds = a1.toggle("Inclure des obligations d'État", True)
     bond_ret = a2.number_input("Rendement des obligations (%)", 0.0, 15.0, 6.0, 0.25) / 100
@@ -127,39 +129,45 @@ s = optimizer.stats(w, inp, params)
 st.session_state["optim"] = {"mu": s["expected_return"], "sigma": s["volatility"], "weights": w, "profile": prof["profile"]}
 
 # ---------------- résultat ----------------
-ui.section("Résultat", f"Portefeuille {prof['profile'].lower()}")
+ui.section("Étape 3 sur 3", f"Ton portefeuille {prof['profile'].lower()}")
+bad_year = (
+    (ui.pct(s["bad_year_95"], 1, True), "ce que tu pourrais perdre une mauvaise année (1 sur 20)", False)
+    if s["bad_year_95"] < 0
+    else (ui.pct(s["bad_year_95"], 1, True), "même une mauvaise année (1 sur 20), selon le passé ; rien n'est garanti", False)
+)
+EQUITY_ONLY = 0.995
+mix = (
+    "uniquement des actions"
+    if s["equity_share"] >= EQUITY_ONLY
+    else f"{ui.pct(s['equity_share'], 0)} en actions, le reste en obligations"
+)
 ui.metric_cards(
     [
-        (ui.pct(s["expected_return"], 1), "rendement espéré par an, dividendes compris", True),
-        (ui.pct(s["volatility"], 1), "volatilité annuelle (ampleur des hauts et des bas)", False),
-        (ui.pct(s["bad_year_95"], 1, True), "mauvaise année (1 année sur 20)", False),
-        (f"{s['lines']} · {ui.pct(s['equity_share'], 0)}", "lignes d'actions · part en actions", False),
+        (ui.pct(s["expected_return"], 1), "gain moyen espéré par an, dividendes compris (jamais garanti)", True),
+        bad_year,
+        (f"{s['lines']} actions", mix, False),
     ]
 )
 
 orders = optimizer.to_orders(w, inp, capital)
 left, right = st.columns([3, 2])
 with left:
-    st.markdown("**Les ordres à passer**")
+    st.markdown("**Ce qu'il faut demander à ta SGI d'acheter**")
     st.dataframe(
-        orders[["ticker", "name", "sector", "quantity", "price", "gross", "fees", "total", "weight_real", "yield_net"]].rename(
+        orders[["name", "quantity", "price", "fees", "total", "weight_real"]].rename(
             columns={
-                "ticker": "Ticker",
                 "name": "Valeur",
-                "sector": "Secteur",
                 "quantity": "Quantité",
                 "price": "Cours",
-                "gross": "Montant",
                 "fees": "Frais",
                 "total": "Total débité",
-                "weight_real": "Poids",
-                "yield_net": "Rdt net",
+                "weight_real": "Part",
             }
         ),
         hide_index=True,
         width="stretch",
-        column_config={k: st.column_config.NumberColumn(format="%.0f F") for k in ["Cours", "Montant", "Frais", "Total débité"]}
-        | {"Poids": st.column_config.NumberColumn(format="percent"), "Rdt net": st.column_config.NumberColumn(format="percent")},
+        column_config={k: st.column_config.NumberColumn(format="%.0f F") for k in ["Cours", "Frais", "Total débité"]}
+        | {"Part": st.column_config.NumberColumn(format="percent")},
     )
     st.markdown(
         f'Total débité <span class="elx-num">{ui.fcfa(orders["total"].sum())}</span> · frais '
@@ -197,106 +205,109 @@ with right:
 
 b1, b2 = st.columns(2)
 with b1:
-    pname = st.text_input("Nom du portefeuille virtuel", f"{prof['profile']} {date.today():%d/%m/%Y}")
-    if st.button("Créer ce portefeuille virtuel", icon=":material/add_circle:"):
+    pname = st.text_input("Nom du portefeuille à suivre", f"{prof['profile']} {date.today():%d/%m/%Y}")
+    if st.button("Suivre ce portefeuille dans « Mon portefeuille »", type="primary", icon=":material/add_circle:"):
         try:
             pid = portfolio.mirror_from_orders(pname, orders, date.today().isoformat(), deposit=capital)
             st.success(f"Portefeuille « {pname} » créé : retrouve-le dans **Mon portefeuille**.")
         except db.SAVE_ERRORS as e:
             st.error(f"Création impossible : {e}")
 with b2:
-    st.markdown("Ce portefeuille est transmis à la page **Simulations** (rendement et volatilité ci-dessus).")
-
-# ---------------- frontière ----------------
-ui.section("Comparer", "Frontière efficiente : plus de rendement contre plus de risque")
+    st.markdown("Ce portefeuille est aussi transmis à la page **Simuler mon plan**, pour voir où il peut te mener.")
+    st.page_link("views/simulations.py", label="Simuler mon plan avec ce portefeuille", icon=":material/insights:")
 
 
+# ---------------- pour aller plus loin ----------------
 @st.cache_data(ttl=600, show_spinner="Calcul de la frontière…")
 def front(p: dict[str, Any], with_signals: bool) -> pd.DataFrame:
     """Frontière efficiente (mise en cache)."""
     return optimizer.frontier(estimate(p, with_signals), p)
 
 
-fr = front(params, tilt > 0)
-fig = go.Figure()
-fig.add_trace(
-    go.Scatter(
-        x=fr["volatility"],
-        y=fr["expected_return"],
-        mode="lines",
-        name="Frontière efficiente (meilleurs portefeuilles)",
-        line={"color": ui.AZUR, "width": 2.4},
-        hovertemplate="risque %{x:.1%}<br>rendement %{y:.1%}",
-    )
-)
-for i, (label, pctv) in enumerate(risk_profile.PRESETS.items()):
-    wp = optimizer.optimize(inp, risk_profile.score_to_lambda(pctv), params, allow_bonds)
-    sp = optimizer.stats(wp, inp, params)
+with st.expander("Pour aller plus loin : comparer avec d'autres profils, voir le passé", icon=":material/query_stats:"):
+    st.markdown("**Plus de rendement contre plus de risque** : chaque point est un portefeuille ; la courbe relie les "
+                "meilleurs. Ton portefeuille est le point ambre.")  # fmt: skip
+    fr = front(params, tilt > 0)
+    fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=[sp["volatility"]],
-            y=[sp["expected_return"]],
-            mode="markers+text",
-            text=[label],
-            textposition="bottom right",
-            marker={"size": 9, "color": ui.MUTED},
-            name="Profils types",
-            legendgroup="profils",
-            showlegend=i == 0,
-            textfont={"color": ui.BODY},
+            x=fr["volatility"],
+            y=fr["expected_return"],
+            mode="lines",
+            name="Frontière efficiente (meilleurs portefeuilles)",
+            line={"color": ui.AZUR, "width": 2.4},
+            hovertemplate="risque %{x:.1%}<br>rendement %{y:.1%}",
         )
     )
-fig.add_trace(
-    go.Scatter(
-        x=[s["volatility"]],
-        y=[s["expected_return"]],
-        mode="markers+text",
-        text=["Ton profil"],
-        textposition="top left",
-        marker={"size": 15, "color": ui.ACCENT, "line": {"color": ui.INK, "width": 1.5}},
-        name="Ton portefeuille",
-        textfont={"color": ui.ACCENT, "family": ui.MONO},
+    for i, (label, pctv) in enumerate(risk_profile.PRESETS.items()):
+        wp = optimizer.optimize(inp, risk_profile.score_to_lambda(pctv), params, allow_bonds)
+        sp = optimizer.stats(wp, inp, params)
+        fig.add_trace(
+            go.Scatter(
+                x=[sp["volatility"]],
+                y=[sp["expected_return"]],
+                mode="markers+text",
+                text=[label],
+                textposition="bottom right",
+                marker={"size": 9, "color": ui.MUTED},
+                name="Profils types",
+                legendgroup="profils",
+                showlegend=i == 0,
+                textfont={"color": ui.BODY},
+            )
+        )
+    fig.add_trace(
+        go.Scatter(
+            x=[s["volatility"]],
+            y=[s["expected_return"]],
+            mode="markers+text",
+            text=["Ton profil"],
+            textposition="top left",
+            marker={"size": 15, "color": ui.ACCENT, "line": {"color": ui.INK, "width": 1.5}},
+            name="Ton portefeuille",
+            textfont={"color": ui.ACCENT, "family": ui.MONO},
+        )
     )
-)
-indiv = pd.DataFrame({"vol": np.sqrt(np.diag(inp.cov)), "mu": inp.mu})
-fig.add_trace(
-    go.Scatter(
-        x=indiv["vol"],
-        y=indiv["mu"],
-        mode="markers",
-        name="Actions seules",
-        text=indiv.index,
-        marker={"size": 6, "color": ui.LINE, "line": {"color": ui.MUTED, "width": 0.5}},
-        hovertemplate="%{text}<br>risque %{x:.1%}<br>rendement %{y:.1%}",
+    indiv = pd.DataFrame({"vol": np.sqrt(np.diag(inp.cov)), "mu": inp.mu})
+    fig.add_trace(
+        go.Scatter(
+            x=indiv["vol"],
+            y=indiv["mu"],
+            mode="markers",
+            name="Actions seules",
+            text=indiv.index,
+            marker={"size": 6, "color": ui.LINE, "line": {"color": ui.MUTED, "width": 0.5}},
+            hovertemplate="%{text}<br>risque %{x:.1%}<br>rendement %{y:.1%}",
+        )
     )
-)
-fig.update_layout(
-    height=430,
-    xaxis_title="Volatilité annuelle",
-    yaxis_title="Rendement espéré annuel",
-    xaxis_tickformat=".0%",
-    yaxis_tickformat=".0%",
-)
-st.plotly_chart(ui.with_legend(fig, -0.2), width="stretch")
+    fig.update_layout(
+        height=430,
+        xaxis_title="Volatilité annuelle",
+        yaxis_title="Rendement espéré annuel",
+        xaxis_tickformat=".0%",
+        yaxis_tickformat=".0%",
+    )
+    st.plotly_chart(ui.with_legend(fig, -0.2), width="stretch")
 
-ui.section("Passé", "Comment ce portefeuille se serait comporté")
-h = optimizer.portfolio_history(w, years=hist)
-idx = market.close_panel(years=hist, tickers=["BRVMC"])
-fig = go.Figure(go.Scatter(x=h.index, y=h.values, name="Ce portefeuille (base 100)", line={"color": ui.ACCENT, "width": 2.2}))
-if "BRVMC" in idx and idx["BRVMC"].notna().any():
-    b = idx["BRVMC"].resample("W-FRI").last().reindex(h.index).ffill().bfill()
-    fig.add_trace(go.Scatter(x=b.index, y=100 * b / b.iloc[0], name="BRVM Composite", line={"color": ui.AZUR, "width": 1.6}))
-fig.update_layout(height=360, yaxis_title="Base 100")
-st.plotly_chart(ui.with_legend(fig), width="stretch")
-st.caption(
-    "Simulation rétrospective, rééquilibrée chaque semaine, hors frais et hors dividendes : "
-    "les poids sont choisis avec les données de cette même période, le passé paraît donc meilleur qu'il ne l'était."
-)
+    st.markdown("**Comment ce portefeuille se serait comporté dans le passé**")
+    h = optimizer.portfolio_history(w, years=hist)
+    idx = market.close_panel(years=hist, tickers=["BRVMC"])
+    fig = go.Figure(go.Scatter(x=h.index, y=h.values, name="Ce portefeuille (base 100)", line={"color": ui.ACCENT, "width": 2.2}))
+    if "BRVMC" in idx and idx["BRVMC"].notna().any():
+        b = idx["BRVMC"].resample("W-FRI").last().reindex(h.index).ffill().bfill()
+        fig.add_trace(go.Scatter(x=b.index, y=100 * b / b.iloc[0], name="BRVM Composite", line={"color": ui.AZUR, "width": 1.6}))
+    fig.update_layout(height=360, yaxis_title="Base 100")
+    st.plotly_chart(ui.with_legend(fig), width="stretch")
+    st.caption(
+        "Simulation rétrospective, rééquilibrée chaque semaine, hors frais et hors dividendes : "
+        "les poids sont choisis avec les données de cette même période, le passé paraît donc meilleur qu'il ne l'était."
+    )
 
-st.caption(
-    f"Risque estimé sur {len(inp.tickers)} valeurs ; covariance rapprochée à {ui.pct(inp.cov_shrinkage, 0)} d'une corrélation "
-    "commune (intensité optimale de Ledoit-Wolf) pour limiter le bruit de l'historique."
-)
-if inp.excluded:
-    with st.expander(f"{len(inp.excluded)} titres écartés par les filtres"):
+    st.caption(
+        f"Aversion au risque utilisée : λ = {ui.nb(prof['lambda'], 1)}. Risque estimé sur {len(inp.tickers)} valeurs ; "
+        f"covariance rapprochée à {ui.pct(inp.cov_shrinkage, 0)} d'une corrélation commune "
+        "(intensité optimale de Ledoit-Wolf) pour limiter le bruit de l'historique."
+    )
+    if inp.excluded:
+        st.markdown(f"**{len(inp.excluded)} titres écartés par les filtres** (historique trop court ou trop peu échangés)")
         st.dataframe(pd.Series(inp.excluded, name="Raison"), width="stretch")

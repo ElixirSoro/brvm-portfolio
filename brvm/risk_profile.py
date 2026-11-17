@@ -9,11 +9,11 @@ import math
 # (question, [(réponse, points 0..4)])
 QUESTIONS = [
     (
-        "Dans combien de temps aurez-vous besoin de cet argent ?",
+        "Dans combien de temps auras-tu besoin de cet argent ?",
         [("Moins de 2 ans", 0), ("2 à 5 ans", 1), ("5 à 8 ans", 2), ("8 à 12 ans", 3), ("Plus de 12 ans", 4)],
     ),
     (
-        "Votre placement perd 25 % en un an. Que faites-vous ?",
+        "Ton placement perd 25 % en un an. Que fais-tu ?",
         [
             ("Je vends tout", 0),
             ("Je vends une partie", 1),
@@ -23,7 +23,7 @@ QUESTIONS = [
         ],
     ),
     (
-        "Quel scénario préférez-vous sur 10 ans, pour 1 000 000 F placés ?",
+        "Quel scénario préfères-tu sur 10 ans, pour 1 000 000 F placés ?",
         [
             ("1,7 M F garanti", 0),
             ("Entre 1,4 et 2,2 M F", 1),
@@ -33,15 +33,15 @@ QUESTIONS = [
         ],
     ),
     (
-        "Quelle part de votre épargne totale représente ce placement ?",
+        "Quelle part de ton épargne totale représente ce placement ?",
         [("Plus de 75 %", 0), ("50 à 75 %", 1), ("25 à 50 %", 2), ("10 à 25 %", 3), ("Moins de 10 %", 4)],
     ),
     (
-        "Avez-vous une épargne de précaution (3 à 6 mois de dépenses) à côté ?",
+        "As-tu une épargne de précaution (3 à 6 mois de dépenses) à côté ?",
         [("Non", 0), ("Moins de 3 mois", 1), ("Oui, 3 à 6 mois", 3), ("Oui, plus de 6 mois", 4)],
     ),
     (
-        "Votre expérience des placements en bourse :",
+        "Ton expérience des placements en bourse :",
         [
             ("Aucune", 0),
             ("J'en ai entendu parler", 1),

@@ -15,8 +15,8 @@ Version 0.2 · prototype · le cadrage complet est dans [ARCHITECTURE.md](ARCHIT
 | Accueil | Salutation et état de la séance, valeur et courbe de tes portefeuilles, indice, objectif personnel, raccourcis, variations du jour, articles repérés par la veille, reprise du parcours |
 | Marché | Les 48 valeurs : cours, variation, rendement en dividende net, liquidité, signal ; historique d'une valeur et ses actualités |
 | Historique des cours | Cours d'une valeur ou d'un indice depuis 2016, par jour, semaine ou mois : ouverture, plus haut, plus bas, clôture, variation, titres et valeur échangés ; ajustement des fractionnements ; export Excel et CSV |
-| Profil et optimiseur | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
-| Simulations | Monte-Carlo sur 1 à 30 ans : fourchette des résultats, probabilité d'atteindre l'objectif, versement nécessaire |
+| Mon portefeuille idéal (Profil et optimiseur) | Questionnaire de risque → portefeuille optimal (moyenne-variance), ordres d'achat frais compris, frontière efficiente |
+| Simuler mon plan | Monte-Carlo sur 1 à 30 ans : fourchette des résultats, probabilité d'atteindre l'objectif, versement nécessaire |
 | Mon portefeuille | Copie virtuelle du portefeuille réel : opérations, frais, dividendes nets d'IRVM, droits de garde, performance vs BRVM Composite |
 | Objectifs et note du jour | Objectifs de la semaine (actions à mener ou objectifs chiffrés) et note quotidienne rédigée par Claude via le connecteur Supabase (tâche planifiée du compte Claude, sans clé API) : veille, actualité, portefeuille, ajustements à étudier |
 | Documents officiels | Lecture des Bulletins Officiels de la Cote (cours officiels, PER, rendements, indices, communiqués, assemblées générales) et des états financiers publiés par les sociétés sur brvm.org |

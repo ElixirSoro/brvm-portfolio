@@ -41,7 +41,7 @@ method = "normal"
 monthly_hist = None
 if src == sources[0]:
     if not opt:
-        st.info("Passe d'abord par **Profil et optimiseur**.")
+        st.info("Passe d'abord par **Mon portefeuille idéal**.")
         st.stop()
     mu, sigma = opt["mu"], opt["sigma"]
     st.markdown(f"Portefeuille **{opt['profile']}** : rendement espéré {ui.pct(mu)}, volatilité {ui.pct(sigma)}.")
