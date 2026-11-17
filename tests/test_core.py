@@ -286,3 +286,16 @@ def test_account_status_is_rechecked_at_most_once_a_minute(monkeypatch):
     st.session_state[ui.SESSION_USER]["checked"] -= ui.ACTIVE_CHECK_S + 1
     monkeypatch.setattr(auth, "is_active", lambda uid: False)
     assert ui.current_user() is None and ui.SESSION_USER not in st.session_state  # suspendu : session fermée
+
+
+def test_inflation_gives_values_in_todays_francs():
+    plan = simulation.Plan(initial=1_000_000, monthly=0, years=10, goal=1_000_000, inflation=0.03)
+    model = simulation.Returns(0.0, 0.0)  # aucun rendement, aucun risque : seule l'inflation joue
+    res = simulation.simulate(replace(plan, buy_fee_rate=0.0, custody_rate=0.0), model, n_paths=10)
+    assert res["final_median"] == pytest.approx(1_000_000)
+    assert res["final_median_real"] == pytest.approx(1_000_000 / 1.03**10)  # pouvoir d'achat rogné
+    assert res["prob_goal"] == 1.0 and res["prob_goal_real"] == 0.0
+    no_infl = simulation.simulate(replace(plan, inflation=0.0, buy_fee_rate=0.0, custody_rate=0.0), model, n_paths=10)
+    assert no_infl["final_median_real"] == pytest.approx(no_infl["final_median"])
+    with pytest.raises(ValueError):
+        simulation.simulate(replace(plan, inflation=0.9), model, n_paths=10)

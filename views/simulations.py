@@ -9,7 +9,7 @@ import streamlit as st
 from brvm import market, optimizer, portfolio, simulation, ui
 
 ui.setup(
-    "Simulations",
+    "Simuler mon plan",
     "Où ce plan peut-il t'amener ?",
     "Des milliers de trajectoires possibles du marché, avec tes versements, les dividendes réinvestis et les frais. "
     "Le résultat n'est pas une promesse : c'est une fourchette.",
@@ -32,7 +32,27 @@ group = d2.select_slider(
     format_func=lambda m: f"{m} mois",
     help="Regrouper les versements limite le poids du courtage minimum.",
 )
-paths = d3.select_slider("Nombre de trajectoires", [1000, 2000, 5000, 10000], 5000)
+inflation = (
+    d3.slider(
+        "Hausse des prix par an (inflation)",
+        0.0,
+        10.0,
+        2.0,
+        0.5,
+        format="%.1f %%",
+        help="Sert à exprimer les résultats en francs d'aujourd'hui : ce que l'argent permettra vraiment d'acheter. "
+        "La BCEAO vise une inflation comprise entre 1 et 3 % par an dans l'UEMOA.",
+    )
+    / 100
+)
+real = st.toggle(
+    "Montants en francs d'aujourd'hui (pouvoir d'achat, inflation déduite)",
+    True,
+    help="Activé, 5 millions dans 10 ans sont ramenés à ce qu'ils vaudraient aujourd'hui ; l'objectif est lui aussi "
+    "compris en francs d'aujourd'hui.",
+)
+with st.expander("Précision du calcul"):
+    paths = st.select_slider("Nombre de trajectoires simulées", [1000, 2000, 5000, 10000], 5000)
 
 ui.section("Le placement", "Rendement et risque")
 sources = ["Portefeuille de l'optimiseur", "Profil type", "Mon portefeuille virtuel", "Saisie libre"]
@@ -84,21 +104,37 @@ else:
     mu = e1.number_input("Rendement annuel moyen (%)", -10.0, 40.0, 8.5, 0.5) / 100
     sigma = e2.number_input("Volatilité annuelle (%)", 0.0, 80.0, 13.0, 0.5) / 100
 
-plan = simulation.Plan(initial=initial, monthly=monthly, years=years, goal=goal, contribution_growth=growth, group_months=group)
+plan = simulation.Plan(
+    initial=initial,
+    monthly=monthly,
+    years=years,
+    goal=goal,
+    contribution_growth=growth,
+    group_months=group,
+    inflation=inflation,
+)
 model = simulation.Returns(mu, sigma, monthly_hist, method)
 res = simulation.simulate(plan, model, n_paths=paths)
 
+sfx = "_real" if real else ""
+unit = " en francs d'aujourd'hui" if real else ""
 ui.section("Résultat", "La fourchette des possibles")
 ui.metric_cards(
     [
-        (ui.mfcfa(res["final_median"]), "valeur médiane à l'échéance (1 chance sur 2 de faire mieux)", True),
-        (f"{ui.mfcfa(res['final_p5'])} – {ui.mfcfa(res['final_p95'])}", "fourchette à 90 %", False),
-        (ui.pct(res["prob_goal"], 0), f"probabilité d'atteindre {ui.mfcfa(goal)}", False),
+        (ui.mfcfa(res["final_median" + sfx]), f"valeur médiane à l'échéance{unit} (1 chance sur 2 de faire mieux)", True),
+        (f"{ui.mfcfa(res['final_p5' + sfx])} – {ui.mfcfa(res['final_p95' + sfx])}", f"fourchette à 90 %{unit}", False),
+        (ui.pct(res["prob_goal" + sfx], 0), f"probabilité d'atteindre {ui.mfcfa(goal)}{unit}", False),
         (ui.mfcfa(res["invested"]), "total versé", False),
     ]
 )
+if real:
+    st.caption(
+        f"Sans tenir compte de l'inflation, la valeur médiane affichée serait {ui.mfcfa(res['final_median'])} : "
+        f"avec {ui.pct(inflation, 1)} de hausse des prix par an, elle permettra d'acheter ce que "
+        f"{ui.mfcfa(res['final_median_real'])} achètent aujourd'hui."
+    )
 
-fan = res["fan"]
+fan = res["fan" + sfx]
 x = fan.index / 12
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=x, y=fan["p95"], line={"width": 0}, showlegend=False, hoverinfo="skip"))
@@ -117,7 +153,7 @@ fig.add_hline(
     annotation_text=f"Objectif {ui.mfcfa(goal)}",
     annotation_font={"color": ui.ACCENT, "family": ui.MONO},
 )
-fig.update_layout(height=460, xaxis_title="Années", yaxis_title="FCFA", hovermode="x unified")
+fig.update_layout(height=460, xaxis_title="Années", yaxis_title="FCFA d'aujourd'hui" if real else "FCFA", hovermode="x unified")
 st.plotly_chart(ui.with_legend(fig), width="stretch")
 
 a, b, c = st.columns(3)
@@ -137,9 +173,9 @@ conf = st.select_slider(
 )
 if st.button("Calculer le versement nécessaire", icon=":material/calculate:"):
     with st.spinner("Recherche du versement…"):
-        need = simulation.required_monthly(plan, model, conf)  # même modèle que la projection ci-dessus
+        need = simulation.required_monthly(plan, model, conf, real=real)  # même modèle que la projection ci-dessus
     st.markdown(
-        f"Pour atteindre **{ui.mfcfa(goal)}** en {years} ans avec {ui.pct(conf, 0)} de chances, il faut verser environ "
+        f"Pour atteindre **{ui.mfcfa(goal)}**{unit} en {years} ans avec {ui.pct(conf, 0)} de chances, il faut verser environ "
         f"<span class='elx-metric' style='font-size:22px'>{ui.fcfa(np.ceil(need / 500) * 500)}</span> par mois.",
         unsafe_allow_html=True,
     )

@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from brvm import auth, db, ecole, fees, goals, home, market, portfolio, ui
+from brvm import alerts, auth, db, ecole, fees, goals, home, market, portfolio, ui
 from brvm.bots import signals
 from brvm.data import quotes as quotes_src
 
@@ -213,6 +213,60 @@ def quick_operation(ports: pd.DataFrame) -> None:
     st.caption("Retrait, frais de garde, coupon, ou frais lus sur l'avis d'opéré : page **Mon portefeuille**.")
 
 
+def holdings(ports: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+    """Positions valorisées de tous les portefeuilles du compte (regroupées par titre) et valeur totale."""
+    frames, total = [], 0.0
+    for pid in ports["id"]:
+        pos, s = portfolio.valuation(int(pid))
+        total += float(s["total"])
+        if not pos.empty:
+            frames.append(pos[["ticker", "name", "sector", "quantity", "value"]])
+    if not frames:
+        return pd.DataFrame(columns=["ticker", "name", "sector", "quantity", "value"]), total
+    merged = pd.concat(frames).groupby(["ticker", "name", "sector"], as_index=False)[["quantity", "value"]].sum()
+    return merged, total
+
+
+def show_watch(ports: pd.DataFrame) -> None:
+    """Points à surveiller (poids, cours en retard, articles forts) et dividendes attendus sur 12 mois."""
+    today = date.today()
+    last = db.df("SELECT MAX(date) AS d FROM prices")["d"].iloc[0]
+    found: list[alerts.Alert] = []
+    stale = alerts.stale_prices(date.fromisoformat(str(last)[:10]) if last else None, today)
+    if stale:
+        found.append(stale)
+    pos, total = holdings(ports) if not ports.empty else (pd.DataFrame(), 0.0)
+    held = set(pos["ticker"]) if not pos.empty else set()
+    found += alerts.concentration(pos, total)
+    found += alerts.strong_news(signals.impacts(days=alerts.NEWS_DAYS + 1), held, today)
+    shares = {str(t): float(q) for t, q in zip(pos["ticker"], pos["quantity"], strict=True)} if held else {}
+    coming = alerts.expected_dividends(shares, market.dividend_table(), today)
+    if not found and coming.empty:
+        return
+    ui.section("Vigilance", "À surveiller et dividendes attendus")
+    left, right = st.columns([1.2, 1])
+    with left:
+        if not found:
+            st.success("Rien de particulier à signaler aujourd'hui.", icon=":material/check_circle:")
+        for a in found:
+            (st.warning if a.level == alerts.WARNING else st.info)(a.text, icon=a.icon)
+    with right:
+        if coming.empty:
+            st.caption("Aucun dividende attendu sur tes actions dans les 12 prochains mois, d'après le calendrier.")
+        else:
+            table = coming.assign(
+                Quand=[f"{d:%m/%Y}" for d in coming["date"]],
+                Action=coming["ticker"],
+                Montant=[ui.fcfa(v) for v in coming["total"]],
+                Statut=coming["status"],
+            )[["Quand", "Action", "Montant", "Statut"]]
+            st.dataframe(table.rename(columns={"Montant": "Montant net estimé"}), hide_index=True, width="stretch")
+            st.caption(
+                f"Environ {ui.fcfa(coming['total'].sum())} nets sur 12 mois. « Estimé » : le dernier dividende versé, "
+                "reconduit un an plus tard ; le montant réel dépend des résultats de chaque société."
+            )
+
+
 def show_coach() -> None:
     """Objectifs de la semaine et dernière note de Claude, avec un lien vers la page dédiée."""
     week = goals.list_week(goals.week_start(date.today()))
@@ -302,6 +356,7 @@ with right_col:
     ui.section("Veille", "Ce que les bots ont repéré")
     show_news()
 
+show_watch(my_ports)
 show_coach()
 show_quest()
 

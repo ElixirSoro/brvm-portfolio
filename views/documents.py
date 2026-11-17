@@ -188,7 +188,7 @@ with tab_fin:
         pick = st.selectbox("Rapport à analyser", list(titles), format_func=titles.__getitem__)
         ai_ok = bool(config.ANTHROPIC_API_KEY)
         use_ai = st.toggle(
-            "Lire avec l'IA (indispensable pour les PDF scannés)",
+            "Lire avec l'IA (plus fiable, surtout pour les PDF scannés)",
             ai_ok,
             disabled=not ai_ok,
             help=None if ai_ok else "Ajoute ANTHROPIC_API_KEY dans .env pour activer la lecture par IA.",

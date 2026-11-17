@@ -1,0 +1,50 @@
+# Garde le site éveillé : Streamlit Community Cloud met en veille une application sans visite pendant 12 heures.
+# Une visite toutes les 8 heures avec un vrai navigateur ; si la page de mise en veille s'affiche, le bouton de réveil
+# est cliqué. Aucun secret, aucune écriture : seulement une visite de la page d'accueil.
+name: Réveil du site
+on:
+  schedule:
+    - cron: "17 */8 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+jobs:
+  visite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SITE: https://brvm-portfolio-soro.streamlit.app/
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Navigateur
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Visite
+        shell: python
+        run: |
+          import os
+          from playwright.sync_api import sync_playwright
+
+          WAKE = "get this app back up"
+          with sync_playwright() as pw:
+              browser = pw.chromium.launch()
+              page = browser.new_page()
+              page.goto(os.environ["SITE"], wait_until="domcontentloaded", timeout=90_000)
+              page.wait_for_timeout(15_000)
+              button = page.get_by_role("button", name=WAKE)
+              if button.count():
+                  button.first.click()
+                  page.wait_for_timeout(60_000)
+                  state = "réveillé"
+              else:
+                  state = "déjà éveillé"
+              browser.close()
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write(f"Site {state}.\n")
+          print(f"Site {state}.")
