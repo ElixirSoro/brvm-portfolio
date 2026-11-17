@@ -21,7 +21,7 @@ from typing import Any
 import pandas as pd
 import requests
 
-from . import config, db
+from . import config, db, ocr
 from .analysis import financials as fin
 from .data import boc, reports
 
@@ -228,14 +228,16 @@ def analyze_report(url: str, use_ai: bool = True) -> dict[str, Any]:
     pages = pdf_text_pages(path)
     client = _ai_client() if use_ai else None
     meta: dict[str, Any] = {}
+    method = "IA" if client is not None else "règles"
     if client is not None:
         figures, meta = fin.extract_ai(path, client)
     elif fin.is_scanned(pages):
-        raise fin.ExtractionError("PDF scanné : ajoute une clé API Claude dans .env pour le lire")
+        if not ocr.available():
+            raise fin.ExtractionError("PDF scanné : ajoute une clé API Claude ou installe Tesseract pour le lire")
+        figures, method = fin.extract_rules(ocr.pages_text(path)), "OCR + règles"
     else:
         figures = fin.extract_rules(pages)
     period = rep["period"] or meta.get("period") or rep["published"] or UNKNOWN_PERIOD
-    method = "IA" if client is not None else "règles"
     db.executemany(
         "INSERT OR REPLACE INTO financials VALUES (?,?,?,?,?,?,?,?)",
         [(rep["ticker"], period, f.metric, f.current, f.previous, f.method, f.confidence, url) for f in figures.values()],

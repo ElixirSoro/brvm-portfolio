@@ -116,7 +116,8 @@ STEPS = (
             "rapport** pour extraire chiffre d'affaires, résultat net, capitaux propres…",
             "Onglet **Agenda des émetteurs** : communiqués, dividendes annoncés et assemblées générales.",
         ),
-        "Les rapports scannés ne se lisent qu'avec la clé API Claude. Les chiffres lus par règles sont marqués "
+        "Les rapports scannés sont lus par reconnaissance de caractères, ou par l'IA si la clé API Claude est configurée. "
+        "Les chiffres lus par règles sont marqués "
         "« confiance faible » : vérifie-les sur le document avant de t'en servir.",
     ),
     Step(
@@ -208,7 +209,7 @@ FAQ = (
     (
         "Faut-il une clé API Claude ?",
         "Pas pour la note du jour : elle passe par ton compte Claude et le connecteur de ta base. La clé API reste utile "
-        "pour l'analyse fine des articles dans la page Veille et pour lire les rapports scannés.",
+        "pour l'analyse fine des articles dans la page Veille et pour lire les rapports scannés avec plus de fiabilité.",
     ),
     ("Une page affiche « Aucun cours en base »", "Les données ne sont pas encore chargées : commence par l'étape 1 (Réglages)."),
 )
